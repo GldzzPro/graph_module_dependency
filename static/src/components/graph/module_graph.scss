@@ -1,0 +1,24 @@
+.o_module_graph {
+  height: 100%;
+  padding: 16px;
+}
+
+.module_graph_nav {
+  max-height: 600px;
+  overflow-y: auto;
+}
+
+.module_graph_nav_list {
+  max-height: 500px;
+  overflow-y: auto;
+}
+
+.module_selected {
+  background-color: #e9ecef;
+  font-weight: bold;
+}
+
+.module_graph_container {
+  width: 100%;
+  background-color: #ffffff;
+}

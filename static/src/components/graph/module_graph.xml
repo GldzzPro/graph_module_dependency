@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="module_graphe_template">
+        <div class="o_module_graph">
+            <div class="row">
+                <div class="col-md-3">
+                    <div class="module_graph_nav">
+                        <div class="input-group mb-3">
+                            <input type="text" class="form-control" placeholder="Search modules..." t-on-keyup="onInputKeyup"/>
+                            <div class="input-group-append">
+                                <span class="input-group-text">
+                                    <i class="fa fa-search"/>
+                                </span>
+                            </div>
+                        </div>
+                        <ul class="list-group module_graph_nav_list">
+                            <t t-foreach="state.filteredNodes" t-as="node" t-key="node.id">
+                                <li t-att-class="isModuleSelected(node.id) ? 'list-group-item module_selected' : 'list-group-item'"
+                                    t-att-data-id="node.id"
+                                    t-att-data-label="node.label"
+                                    t-on-click="onClickModule">
+                                    <t t-esc="node.shortdesc"/> (<t t-esc="node.label"/>)
+                                </li>
+                            </t>
+                        </ul>
+                    </div>
+                </div>
+                <div class="col-md-9">
+                    <div class="module_graph_container border" t-ref="graph" style="height: 600px;"/>
+                </div>
+            </div>
+        </div>
+    </t>
+</templates>
