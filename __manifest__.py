@@ -12,12 +12,16 @@
     ],
     "data": [
         "views/ir_module.xml",
+        "views/dependency_menus.xml",
     ],
     "assets": {
         "web.assets_backend": [
-            "graph_module_dependency/static/src/components/graph/GraphModuleComponent.js",
-            "graph_module_dependency/static/src/components/graph/module_graph.xml",
-            "graph_module_dependency/static/src/components/graph/module_graph.scss",
+            "graph_module_dependency/static/src/components/module_graph/GraphModuleComponent.js",
+            "graph_module_dependency/static/src/components/model_graph/GraphModelComponent.js",
+            "graph_module_dependency/static/src/components/module_graph/module_graph.xml",
+            "graph_module_dependency/static/src/components/model_graph/model_graph.scss",
+            "graph_module_dependency/static/src/components/module_graph/module_graph.scss",
+            "graph_module_dependency/static/src/components/model_graph/model_graph.xml",
         ],
     },
     "images": ["static/description/banner.png"],
