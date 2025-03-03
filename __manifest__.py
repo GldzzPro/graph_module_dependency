@@ -2,8 +2,8 @@
 {
     "name": "Graph Module Dependency",
     "summary": """Graph Module Dependency""",
-    "author": "Kochyn's Band",
-    "website": "https://github.com/kochyns-band/module_dependency_graph",
+    "author": "Farhat BAAROUN",
+    "website": "https://github.com/GldzzPro/graph_module_dependency",
     "category": "Tools",
     "version": "17.0.1.0.0",
     "depends": [
@@ -11,7 +11,7 @@
         "web",
     ],
     "data": [
-        "views/ir_module.xml",
+        "security/ir.model.access.csv",
         "views/dependency_menus.xml",
     ],
     "assets": {

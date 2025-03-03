@@ -4,252 +4,235 @@ import { useService } from "@web/core/utils/hooks";
 import { registry } from '@web/core/registry';
 import { loadJS, loadCSS } from "@web/core/assets";
 
-// Define relationship type colors as a constant
-const RELATION_TYPE_COLOR = {
-    'many2one': '#97c2fc',
-    'one2many': '#AEFCAB',
-    'many2many': '#fcadb7',
+// Define state colors as a constant
+const STATE_COLOR = {
+    'uninstallable': '#eaeaa4',
+    'installed': '#97c2fc',
+    'uninstalled': '#e5f8fc',
+    'to install': '#939afc',
+    'to upgrade': '#AEFCAB',
+    'to remove': '#fcadb7',
 };
 
-export class GraphModelComponent extends Component {
-    static template = "model_graph_template"; // Refers to our QWeb template
-    
+export class GraphModuleComponent extends Component {
+    static template = "module_graphe_template"; // Refers to our QWeb template
+
     static props = {};
 
     setup() {
         this.state = useState({
             nodes: [],
             edges: [],
-            model_info: {},
+            module_info: {},
             filteredNodes: [],
-            selectedModels: new Set(),
+            selectedModules: new Set(),
         });
-        
+
         this.graphNodes = null;
         this.graphEdges = null;
         this.network = null;
-        
+
         this.containerRef = useRef("graph");
         this.orm = useService("orm");
         this.action = useService("action");
-        
+
         onWillStart(async () => {
             // Load vis.js library
             await loadJS("https://cdnjs.cloudflare.com/ajax/libs/vis/4.21.0/vis.min.js");
             await loadCSS("https://cdnjs.cloudflare.com/ajax/libs/vis/4.21.0/vis.min.css");
-            
-            // Fetch model data
+
+            // Fetch module data
             const data = await this.orm.call(
-                'ir.model',
+                'ir.module.module',
                 'search_read',
                 [],
                 {
-                    fields: ['id', 'name', 'model'],
-                    order: 'name',
+                    fields: ['id', 'name', 'shortdesc', 'state'],
+                    order: 'shortdesc',
                 }
             );
-            
-            // Process model data
+
+            // Process module data
             this.state.nodes = data.map(node => ({
                 id: node.id,
                 label: node.name,
-                model: node.model,
+                state: node.state,
+                shortdesc: node.shortdesc,
             }));
-            
+
             // Initially, filtered nodes are the same as all nodes
             this.state.filteredNodes = [...this.state.nodes];
         });
-        
+
         onMounted(() => {
             if (this.containerRef.el) {
                 // Initialize vis.js dataset objects
                 this.graphNodes = new vis.DataSet([]);
                 this.graphEdges = new vis.DataSet([]);
-                
+
                 // Initialize the network
                 this.network = new vis.Network(
                     this.containerRef.el,
-                    { 
-                        nodes: this.graphNodes, 
-                        edges: this.graphEdges 
+                    {
+                        nodes: this.graphNodes,
+                        edges: this.graphEdges
                     },
                     {
                         edges: {
                             arrows: 'to',
-                            font: {
-                                size: 10,
-                                align: 'middle'
-                            }
-                        },
-                        physics: {
-                            stabilization: true,
-                            barnesHut: {
-                                gravitationalConstant: -2000,
-                                springConstant: 0.04,
-                                springLength: 200
-                            }
                         }
                     }
                 );
-                
+
                 // Set up network event handlers
                 this.setupNetworkEvents();
             }
         });
     }
-    
+
     /**
      * Set up event handlers for the vis.js network
      */
     setupNetworkEvents() {
-        // Double-click to show model information
+        // Double-click to show module information
         this.network.on("doubleClick", (params) => {
-            const modelId = params.nodes[0];
-            if (modelId) {
-                this.showModelInfo(modelId);
+            const moduleId = params.nodes[0];
+            if (moduleId) {
+                this.showModuleInfo(moduleId);
             }
         });
-        
+
         // Right-click to remove a node from the graph
         this.network.on("oncontext", (params) => {
             params.event.preventDefault();
             params.event.stopPropagation();
-            
+
             const nodeId = params.nodes[0];
             if (nodeId) {
                 this.graphNodes.remove(nodeId);
-                this.state.selectedModels.delete(nodeId);
-            }
-        });
-        
-        // Display field name on hover
-        this.network.on("hoverEdge", (params) => {
-            const edgeId = params.edge;
-            const edge = this.graphEdges.get(edgeId);
-            if (edge && edge.title) {
-                // Show tooltip with field information
+                this.state.selectedModules.delete(nodeId);
             }
         });
     }
-    
+
     /**
-     * Open the model form view
-     * @param {number} modelId - The ID of the model to display
+     * Open the module form view
+     * @param {number} moduleId - The ID of the module to display
      */
-    showModelInfo(modelId) {
+    showModuleInfo(moduleId) {
         this.action.doAction({
             type: 'ir.actions.act_window',
             view_type: 'form',
             view_mode: 'form',
             views: [[false, 'form']],
             target: 'new',
-            res_model: 'ir.model',
-            res_id: modelId,
+            res_model: 'ir.module.module',
+            res_id: moduleId,
         });
     }
-    
+
     /**
-     * Handle filter input for model search
+     * Handle filter input for module search
      * @param {Event} event - Input keyup event
      */
     onInputKeyup(event) {
         const filter = event.target.value.toUpperCase();
-        
+
         // Filter nodes based on search input
-        this.state.filteredNodes = this.state.nodes.filter(node => 
-            node.model.toUpperCase().includes(filter) || 
-            node.label.toUpperCase().includes(filter)
+        this.state.filteredNodes = this.state.nodes.filter(node =>
+            node.label.toUpperCase().includes(filter) ||
+            node.shortdesc.toUpperCase().includes(filter)
         );
     }
-    
+
     /**
-     * Handle clicking on a model in the navigation list
+     * Handle clicking on a module in the navigation list
      * @param {Event} event - Click event
      */
-    async onClickModel(event) {
-        const modelId = parseInt(event.target.dataset.id);
-        const modelLabel = event.target.dataset.label;
-        
-        if (!modelId || this.state.selectedModels.has(modelId)) {
+    async onClickModule(event) {
+        const moduleId = parseInt(event.target.dataset.id);
+        const moduleLabel = event.target.dataset.label;
+
+        if (!moduleId || this.state.selectedModules.has(moduleId)) {
             return;
         }
-        
-        // Update the graph with the selected model
+
+        // Update the graph with the selected module
         this.graphNodes.update([{
-            id: modelId,
-            label: modelLabel
+            id: moduleId,
+            label: moduleLabel
         }]);
-        
-        this.state.selectedModels.add(modelId);
-        
-        // Fetch model relationships
+
+        this.state.selectedModules.add(moduleId);
+
+        // Fetch module dependencies
         try {
             const data = await this.orm.call(
-                'ir.model',
-                'get_model_relation_graph',
-                [modelId]
+                'ir.module.module',
+                'get_module_graph',
+                [moduleId]
             );
-            
+
             // Process and add nodes to the graph
             const nodes = [];
             data.nodes.forEach(node => {
                 if (node.id) {
                     nodes.push({
-                        id: node.id, 
-                        label: node.label, 
-                        title: node.model,
-                        state: node.model
+                        id: node.id,
+                        label: node.label,
+                        color: STATE_COLOR[node.state],
+                        state: node.state
                     });
-                    this.state.selectedModels.add(node.id);
+                    this.state.selectedModules.add(node.id);
+
                 }
             });
             this.graphNodes.update(nodes);
-            
+
             // Process and add edges to the graph
             const edges = [];
             data.edges.forEach(edge => {
-                const existingEdge = this.state.edges.find(e => 
+                const existingEdge = this.state.edges.find(e =>
                     e.from === edge.from && e.to === edge.to
                 );
-                
+
                 if (!existingEdge) {
                     const newEdge = {
-                        from: edge.from, 
-                        to: edge.to,
-                        title: edge.field,
-                        label: edge.field,
+                        from: edge.from,
+                        to: edge.to
                     };
-                    
-                    if (edge.type) {
+
+                    if (edge.type === 'exclusion') {
                         newEdge.color = {
-                            color: RELATION_TYPE_COLOR[edge.type] || '#97c2fc', 
-                            highlight: RELATION_TYPE_COLOR[edge.type] || '#97c2fc'
+                            color: 'red',
+                            highlight: 'red'
                         };
-                        newEdge.title = `${edge.field} (${edge.type})`;
                     }
-                    
+
                     this.state.edges.push(newEdge);
                     edges.push(newEdge);
+
                 }
             });
-            
+
             this.graphEdges.update(edges);
+            console.log({ nodes, edges, gE: this.graphEdges })
         } catch (error) {
-            console.error("Error fetching model graph data:", error);
+            console.error("Error fetching module graph data:", error);
         }
     }
-    
+
     /**
-     * Check if a model is selected in the graph
-     * @param {number} modelId - Model ID to check
-     * @returns {boolean} - True if the model is selected
+     * Check if a module is selected in the graph
+     * @param {number} moduleId - Module ID to check
+     * @returns {boolean} - True if the module is selected
      */
-    isModelSelected(modelId) {
-        return this.state.selectedModels.has(modelId);
+    isModuleSelected(moduleId) {
+        return this.state.selectedModules.has(moduleId);
     }
 }
 
 // Register this component as a client action
-registry.category("actions").add("model_graph", GraphModelComponent);
+registry.category("actions").add("module_graph", GraphModuleComponent);
 
-export default GraphModelComponent;
+export default GraphModuleComponent;

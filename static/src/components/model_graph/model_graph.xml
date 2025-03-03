@@ -13,6 +13,18 @@
                                 </span>
                             </div>
                         </div>
+                        
+                        <div class="form-group mb-3">
+                            <label for="depthSelector">Relation Depth:</label>
+                            <select id="depthSelector" class="form-control" t-on-change="onChangeDepth">
+                                <option value="1">1 Level</option>
+                                <option value="2" selected="selected">2 Levels</option>
+                                <option value="3">3 Levels</option>
+                                <option value="4">4 Levels</option>
+                            </select>
+                            <small class="form-text text-muted">Higher values may impact performance</small>
+                        </div>
+                        
                         <ul class="list-group model_graph_nav_list">
                             <t t-foreach="state.filteredNodes" t-as="node" t-key="node.id">
                                 <li t-att-class="isModelSelected(node.id) ? 'list-group-item model_selected' : 'list-group-item'"
