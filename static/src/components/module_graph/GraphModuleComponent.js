@@ -4,16 +4,6 @@ import { useService } from "@web/core/utils/hooks";
 import { registry } from '@web/core/registry';
 import { loadJS, loadCSS } from "@web/core/assets";
 
-// Define state colors as a constant
-const STATE_COLOR = {
-    'uninstallable': '#eaeaa4',
-    'installed': '#97c2fc',
-    'uninstalled': '#e5f8fc',
-    'to install': '#939afc',
-    'to upgrade': '#AEFCAB',
-    'to remove': '#fcadb7',
-};
-
 export class GraphModuleComponent extends Component {
     static template = "module_graphe_template"; // Refers to our QWeb template
 
@@ -26,6 +16,14 @@ export class GraphModuleComponent extends Component {
             module_info: {},
             filteredNodes: [],
             selectedModules: new Set(),
+            stateColors: {
+                'uninstallable': '#eaeaa4',
+                'installed': '#97c2fc',
+                'uninstalled': '#e5f8fc',
+                'to install': '#939afc',
+                'to upgrade': '#AEFCAB',
+                'to remove': '#fcadb7',
+            }
         });
 
         this.graphNodes = null;
@@ -180,11 +178,10 @@ export class GraphModuleComponent extends Component {
                     nodes.push({
                         id: node.id,
                         label: node.label,
-                        color: STATE_COLOR[node.state],
+                        color: this.state.stateColors[node.state],
                         state: node.state
                     });
                     this.state.selectedModules.add(node.id);
-
                 }
             });
             this.graphNodes.update(nodes);
@@ -211,12 +208,10 @@ export class GraphModuleComponent extends Component {
 
                     this.state.edges.push(newEdge);
                     edges.push(newEdge);
-
                 }
             });
 
             this.graphEdges.update(edges);
-            console.log({ nodes, edges, gE: this.graphEdges })
         } catch (error) {
             console.error("Error fetching module graph data:", error);
         }
@@ -229,6 +224,35 @@ export class GraphModuleComponent extends Component {
      */
     isModuleSelected(moduleId) {
         return this.state.selectedModules.has(moduleId);
+    }
+
+    /**
+     * Handle color change for a module state
+     * @param {Event} event - Change event from the color input
+     */
+    onChangeStateColor(event) {
+        const state = event.target.dataset.state;
+        const color = event.target.value;
+        
+        // Update the color in state
+        this.state.stateColors[state] = color;
+        
+        // Update the nodes in the graph with the new color
+        if (this.graphNodes) {
+            const nodesToUpdate = [];
+            this.graphNodes.forEach(node => {
+                if (node.state === state) {
+                    nodesToUpdate.push({
+                        id: node.id,
+                        color: color
+                    });
+                }
+            });
+            
+            if (nodesToUpdate.length > 0) {
+                this.graphNodes.update(nodesToUpdate);
+            }
+        }
     }
 }
 

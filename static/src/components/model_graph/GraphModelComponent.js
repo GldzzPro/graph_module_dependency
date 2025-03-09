@@ -4,13 +4,6 @@ import { useService } from "@web/core/utils/hooks";
 import { registry } from '@web/core/registry';
 import { loadJS, loadCSS } from "@web/core/assets";
 
-// Define relationship type colors as a constant
-const RELATION_TYPE_COLOR = {
-    'many2one': '#97c2fc',
-    'one2many': '#AEFCAB',
-    'many2many': '#fcadb7',
-};
-
 export class GraphModelComponent extends Component {
     static template = "model_graph_template"; // Refers to our QWeb template
 
@@ -24,6 +17,12 @@ export class GraphModelComponent extends Component {
             filteredNodes: [],
             selectedModels: new Set(),
             maxDepth: 2, // Default max depth
+            relationTypeColors: {
+                'many2one': '#red',
+                'one2one': '#97c2fc',
+                'one2many': '#AEFCAB',
+                'many2many': '#fcadb7',
+            }
         });
 
         this.graphNodes = null;
@@ -231,8 +230,8 @@ export class GraphModelComponent extends Component {
 
                     if (edge.type) {
                         newEdge.color = {
-                            color: RELATION_TYPE_COLOR[edge.type] || '#97c2fc',
-                            highlight: RELATION_TYPE_COLOR[edge.type] || '#97c2fc'
+                            color: this.state.relationTypeColors[edge.type] || this.state.relationTypeColors.one2one,
+                            highlight: this.state.relationTypeColors[edge.type] || this.state.relationTypeColors.one2one
                         };
                         newEdge.title = `${edge.field} (${edge.type})`;
                     }
@@ -255,6 +254,38 @@ export class GraphModelComponent extends Component {
      */
     isModelSelected(modelId) {
         return this.state.selectedModels.has(modelId);
+    }
+    
+    /**
+     * Handle color change for a relation type
+     * @param {Event} event - Change event from the color input
+     */
+    onChangeRelationColor(event) {
+        const relationType = event.target.dataset.relationType;
+        const color = event.target.value;
+        
+        // Update the color in state
+        this.state.relationTypeColors[relationType] = color;
+        
+        // Update the edges in the graph with the new color
+        if (this.graphEdges) {
+            const edgesToUpdate = [];
+            this.graphEdges.forEach(edge => {
+                if (edge.type === relationType) {
+                    edgesToUpdate.push({
+                        id: edge.id,
+                        color: {
+                            color: color,
+                            highlight: color
+                        }
+                    });
+                }
+            });
+            
+            if (edgesToUpdate.length > 0) {
+                this.graphEdges.update(edgesToUpdate);
+            }
+        }
     }
 }
 

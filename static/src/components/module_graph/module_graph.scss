@@ -22,3 +22,26 @@
   width: 100%;
   background-color: #ffffff;
 }
+
+input[type="color"] {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+}
+
+.card-header h5 {
+  font-size: 1rem;
+}
+
+.form-group label {
+  display: flex;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.form-group label span {
+  min-width: 80px;
+}

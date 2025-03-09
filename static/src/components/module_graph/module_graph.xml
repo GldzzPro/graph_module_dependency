@@ -13,6 +13,27 @@
                                 </span>
                             </div>
                         </div>
+
+                        <!-- Color Palette Configuration -->
+                        <div class="card mb-3">
+                            <div class="card-header">
+                                <h5 class="mb-0">State Color Configuration</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="form-group" t-foreach="Object.keys(state.stateColors)" t-as="stateType" t-key="stateType">
+                                    <label>
+                                        <span t-esc="stateType" class="mr-2"/>
+                                        <input 
+                                            type="color" 
+                                            class="form-control form-control-sm" 
+                                            t-att-value="state.stateColors[stateType]" 
+                                            t-att-data-state="stateType"
+                                            t-on-change="onChangeStateColor"/>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                        
                         <ul class="list-group module_graph_nav_list">
                             <t t-foreach="state.filteredNodes" t-as="node" t-key="node.id">
                                 <li t-att-class="isModuleSelected(node.id) ? 'list-group-item module_selected' : 'list-group-item'"

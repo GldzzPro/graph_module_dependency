@@ -25,6 +25,26 @@
                             <small class="form-text text-muted">Higher values may impact performance</small>
                         </div>
                         
+                        <!-- Color Palette Configuration -->
+                        <div class="card mb-3">
+                            <div class="card-header">
+                                <h5 class="mb-0">Relation Color Configuration</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="form-group" t-foreach="Object.keys(state.relationTypeColors)" t-as="relationType" t-key="relationType">
+                                    <label>
+                                        <span t-esc="relationType" class="mr-2"/>
+                                        <input 
+                                            type="color" 
+                                            class="form-control form-control-sm" 
+                                            t-att-value="state.relationTypeColors[relationType]" 
+                                            t-att-data-relation-type="relationType"
+                                            t-on-change="onChangeRelationColor"/>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                        
                         <ul class="list-group model_graph_nav_list">
                             <t t-foreach="state.filteredNodes" t-as="node" t-key="node.id">
                                 <li t-att-class="isModelSelected(node.id) ? 'list-group-item model_selected' : 'list-group-item'"
