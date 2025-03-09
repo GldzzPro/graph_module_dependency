@@ -163,11 +163,110 @@ export class GraphModelComponent extends Component {
     }
 
     /**
-     * Change the maximum depth for relation traversal
+     * Change the maximum depth for relation traversal and refresh the graph
      * @param {Event} event - Change event from the depth selector
      */
     onChangeDepth(event) {
         this.state.maxDepth = parseInt(event.target.value);
+        
+        // Refresh all selected models with the new depth
+        this.refreshGraphWithNewDepth();
+    }
+    
+    /**
+     * Refresh the entire graph with the new depth setting
+     */
+    async refreshGraphWithNewDepth() {
+        // Clear current graph data
+        this.graphNodes.clear();
+        this.graphEdges.clear();
+        
+        // Store selected models in an array before clearing
+        const selectedModels = Array.from(this.state.selectedModels).map(id => {
+            const node = this.state.nodes.find(n => n.id === id);
+            return node ? { id: node.id, label: node.label } : null;
+        }).filter(Boolean);
+        
+        // Reset selected models
+        this.state.selectedModels.clear();
+        this.state.edges = [];
+        
+        // Re-add each previously selected model with the new depth
+        for (const model of selectedModels) {
+            // Add node back to graph
+            this.graphNodes.update([{
+                id: model.id,
+                label: model.label
+            }]);
+            
+            this.state.selectedModels.add(model.id);
+            
+            // Fetch model relationships with the new depth
+            await this.fetchAndUpdateModelRelations(model.id);
+        }
+    }
+    
+    /**
+     * Fetch and update model relations for a specific model ID
+     * @param {number} modelId - The model ID to fetch relations for
+     */
+    async fetchAndUpdateModelRelations(modelId) {
+        try {
+            const data = await this.orm.call(
+                'ir.model',
+                'get_model_relation_graph',
+                [modelId, this.state.maxDepth]
+            );
+
+            // Process and add nodes to the graph
+            const nodes = [];
+            data.nodes.forEach(node => {
+                if (node.id && !this.state.selectedModels.has(node.id)) {
+                    nodes.push({
+                        id: node.id,
+                        label: node.label,
+                        title: node.model,
+                        state: node.model
+                    });
+                    this.state.selectedModels.add(node.id);
+                }
+            });
+            this.graphNodes.update(nodes);
+
+            // Process and add edges to the graph
+            const edges = [];
+            data.edges.forEach(edge => {
+                const existingEdge = this.state.edges.find(e =>
+                    e.from === edge.from && e.to === edge.to
+                );
+
+                if (!existingEdge) {
+                    const newEdge = {
+                        id: `${edge.from}_${edge.to}_${edge.field}`, // Unique identifier for the edge
+                        from: edge.from,
+                        to: edge.to,
+                        title: edge.field,
+                        label: edge.field,
+                        type: edge.type // Store the relation type
+                    };
+
+                    if (edge.type) {
+                        newEdge.color = {
+                            color: this.state.relationTypeColors[edge.type] || this.state.relationTypeColors.one2one,
+                            highlight: this.state.relationTypeColors[edge.type] || this.state.relationTypeColors.one2one
+                        };
+                        newEdge.title = `${edge.field} (${edge.type})`;
+                    }
+
+                    this.state.edges.push(newEdge);
+                    edges.push(newEdge);
+                }
+            });
+
+            this.graphEdges.update(edges);
+        } catch (error) {
+            console.error("Error fetching model graph data:", error);
+        }
     }
 
     /**
@@ -191,60 +290,7 @@ export class GraphModelComponent extends Component {
         this.state.selectedModels.add(modelId);
 
         // Fetch model relationships with depth limit
-        try {
-            const data = await this.orm.call(
-                'ir.model',
-                'get_model_relation_graph',
-                [modelId, this.state.maxDepth]
-            );
-
-            // Process and add nodes to the graph
-            const nodes = [];
-            data.nodes.forEach(node => {
-                if (node.id) {
-                    nodes.push({
-                        id: node.id,
-                        label: node.label,
-                        title: node.model,
-                        state: node.model
-                    });
-                    this.state.selectedModels.add(node.id);
-                }
-            });
-            this.graphNodes.update(nodes);
-
-            // Process and add edges to the graph
-            const edges = [];
-            data.edges.forEach(edge => {
-                const existingEdge = this.state.edges.find(e =>
-                    e.from === edge.from && e.to === edge.to
-                );
-
-                if (!existingEdge) {
-                    const newEdge = {
-                        from: edge.from,
-                        to: edge.to,
-                        title: edge.field,
-                        label: edge.field,
-                    };
-
-                    if (edge.type) {
-                        newEdge.color = {
-                            color: this.state.relationTypeColors[edge.type] || this.state.relationTypeColors.one2one,
-                            highlight: this.state.relationTypeColors[edge.type] || this.state.relationTypeColors.one2one
-                        };
-                        newEdge.title = `${edge.field} (${edge.type})`;
-                    }
-
-                    this.state.edges.push(newEdge);
-                    edges.push(newEdge);
-                }
-            });
-
-            this.graphEdges.update(edges);
-        } catch (error) {
-            console.error("Error fetching model graph data:", error);
-        }
+        await this.fetchAndUpdateModelRelations(modelId);
     }
 
     /**
@@ -267,11 +313,15 @@ export class GraphModelComponent extends Component {
         // Update the color in state
         this.state.relationTypeColors[relationType] = color;
         
-        // Update the edges in the graph with the new color
+        // Update all edges of this relation type in the graph
         if (this.graphEdges) {
+            // Get all edges that match this relation type
             const edgesToUpdate = [];
-            this.graphEdges.forEach(edge => {
+            
+            // Iterate through all edges in our state
+            this.state.edges.forEach(edge => {
                 if (edge.type === relationType) {
+                    // Create an updated edge object
                     edgesToUpdate.push({
                         id: edge.id,
                         color: {
@@ -282,6 +332,7 @@ export class GraphModelComponent extends Component {
                 }
             });
             
+            // Apply updates to the graph if we have edges to update
             if (edgesToUpdate.length > 0) {
                 this.graphEdges.update(edgesToUpdate);
             }

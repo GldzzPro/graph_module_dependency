@@ -39,9 +39,17 @@ input[type="color"] {
 .form-group label {
   display: flex;
   align-items: center;
-  margin-bottom: 8px;
+  justify-content: space-between;
+  gap: 2px;
+  margin-bottom : 0;
 }
 
-.form-group label span {
+.module_graph_nav .form-group label span {
   min-width: 80px;
+}
+
+.module_graph_nav .card-body {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap : 5px;
 }
