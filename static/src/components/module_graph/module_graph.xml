@@ -3,6 +3,7 @@
     <t t-name="module_graphe_template">
         <div class="o_module_graph">
             <div class="row">
+            
                 <div class="col-md-3">
                     <div class="module_graph_nav">
                         <div class="input-group mb-3">
@@ -13,7 +14,6 @@
                                 </span>
                             </div>
                         </div>
-
                         <!-- Color Palette Configuration -->
                         <div class="card mb-3">
                             <div class="card-header">
@@ -40,12 +40,15 @@
                                     t-att-data-id="node.id"
                                     t-att-data-label="node.label"
                                     t-on-click="onClickModule">
+                                    <img t-att-src="node.icon"  t-attf-class="rounded-circle o_object_fit_cover" width="24" height="24"/>
                                     <t t-esc="node.shortdesc"/> (<t t-esc="node.label"/>)
                                 </li>
                             </t>
                         </ul>
                     </div>
                 </div>
+
+
                 <div class="col-md-9">
                     <div class="module_graph_container border" t-ref="graph" style="height: 600px;"/>
                 </div>

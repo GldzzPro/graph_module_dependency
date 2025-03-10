@@ -4,6 +4,9 @@ import { useService } from "@web/core/utils/hooks";
 import { registry } from '@web/core/registry';
 import { loadJS, loadCSS } from "@web/core/assets";
 
+const DEFAULT_MODULE_ICON = `/base/static/img/icons/default_module_icon.png`;
+
+
 export class GraphModuleComponent extends Component {
     static template = "module_graphe_template"; // Refers to our QWeb template
 
@@ -23,13 +26,11 @@ export class GraphModuleComponent extends Component {
                 'to install': '#939afc',
                 'to upgrade': '#AEFCAB',
                 'to remove': '#fcadb7',
-            }
+            },
         });
-
         this.graphNodes = null;
         this.graphEdges = null;
         this.network = null;
-
         this.containerRef = useRef("graph");
         this.orm = useService("orm");
         this.action = useService("action");
@@ -45,7 +46,7 @@ export class GraphModuleComponent extends Component {
                 'search_read',
                 [],
                 {
-                    fields: ['id', 'name', 'shortdesc', 'state'],
+                    fields: ['id', 'name', 'shortdesc', 'state', 'icon'],
                     order: 'shortdesc',
                 }
             );
@@ -56,7 +57,10 @@ export class GraphModuleComponent extends Component {
                 label: node.name,
                 state: node.state,
                 shortdesc: node.shortdesc,
+                icon: node.icon || DEFAULT_MODULE_ICON,
             }));
+
+
 
             // Initially, filtered nodes are the same as all nodes
             this.state.filteredNodes = [...this.state.nodes];
@@ -67,8 +71,7 @@ export class GraphModuleComponent extends Component {
                 // Initialize vis.js dataset objects
                 this.graphNodes = new vis.DataSet([]);
                 this.graphEdges = new vis.DataSet([]);
-
-                // Initialize the network
+                // Initialize the network with custom node rendering
                 this.network = new vis.Network(
                     this.containerRef.el,
                     {
@@ -78,10 +81,19 @@ export class GraphModuleComponent extends Component {
                     {
                         edges: {
                             arrows: 'to',
+                        },
+                        nodes: {
+                            shape: 'box',
+                            margin: 10,
+                            size: 50,
+                            font: {
+                                size: 12,
+                                face: 'Arial',
+                                multi: 'html'
+                            }
                         }
                     }
                 );
-
                 // Set up network event handlers
                 this.setupNetworkEvents();
             }
@@ -135,12 +147,52 @@ export class GraphModuleComponent extends Component {
      */
     onInputKeyup(event) {
         const filter = event.target.value.toUpperCase();
-
         // Filter nodes based on search input
         this.state.filteredNodes = this.state.nodes.filter(node =>
             node.label.toUpperCase().includes(filter) ||
             node.shortdesc.toUpperCase().includes(filter)
         );
+    }
+    /**
+     * Update all nodes in the graph with current settings
+     */
+    updateAllNodes() {
+        if (!this.graphNodes) return;
+        const nodesToUpdate = [];
+        this.graphNodes.forEach(node => {
+            const originalNode = this.state.nodes.find(n => n.id === node.id);
+            if (originalNode) {
+                nodesToUpdate.push(this.createNodeObject(originalNode));
+            }
+        });
+
+        if (nodesToUpdate.length > 0) {
+            this.graphNodes.update(nodesToUpdate);
+        }
+    }
+
+    /**
+     * Create a node object with proper formatting for the graph
+     * @param {Object} node - The node data
+     * @returns {Object} - Formatted node object for vis.js
+     */
+    createNodeObject(node) {
+        const iconPath = node.icon || DEFAULT_MODULE_ICON;
+        return {
+            id: node.id,
+            label: node.label,
+            color: this.state.stateColors[node.state],
+            state: node.state,
+            image: iconPath,
+            shape: "circularImage",
+            shapeProperties: {
+                useImageSize: true,
+                useBorderWithImage: false,
+                interpolation: false,
+                coordinateOrigin: "center",
+            },
+            title: node.shortdesc
+        };
     }
 
     /**
@@ -149,18 +201,14 @@ export class GraphModuleComponent extends Component {
      */
     async onClickModule(event) {
         const moduleId = parseInt(event.target.dataset.id);
-        const moduleLabel = event.target.dataset.label;
+        const moduleNode = this.state.nodes.find(n => n.id === moduleId);
 
-        if (!moduleId || this.state.selectedModules.has(moduleId)) {
+        if (!moduleId || this.state.selectedModules.has(moduleId) || !moduleNode) {
             return;
         }
 
         // Update the graph with the selected module
-        this.graphNodes.update([{
-            id: moduleId,
-            label: moduleLabel
-        }]);
-
+        this.graphNodes.update([this.createNodeObject(moduleNode)]);
         this.state.selectedModules.add(moduleId);
 
         // Fetch module dependencies
@@ -175,13 +223,12 @@ export class GraphModuleComponent extends Component {
             const nodes = [];
             data.nodes.forEach(node => {
                 if (node.id) {
-                    nodes.push({
-                        id: node.id,
-                        label: node.label,
-                        color: this.state.stateColors[node.state],
-                        state: node.state
-                    });
-                    this.state.selectedModules.add(node.id);
+                    // Find the original node with all information
+                    const originalNode = this.state.nodes.find(n => n.id === node.id);
+                    if (originalNode) {
+                        nodes.push(this.createNodeObject(originalNode));
+                        this.state.selectedModules.add(node.id);
+                    }
                 }
             });
             this.graphNodes.update(nodes);
@@ -233,26 +280,12 @@ export class GraphModuleComponent extends Component {
     onChangeStateColor(event) {
         const state = event.target.dataset.state;
         const color = event.target.value;
-        
+
         // Update the color in state
         this.state.stateColors[state] = color;
-        
-        // Update the nodes in the graph with the new color
-        if (this.graphNodes) {
-            const nodesToUpdate = [];
-            this.graphNodes.forEach(node => {
-                if (node.state === state) {
-                    nodesToUpdate.push({
-                        id: node.id,
-                        color: color
-                    });
-                }
-            });
-            
-            if (nodesToUpdate.length > 0) {
-                this.graphNodes.update(nodesToUpdate);
-            }
-        }
+
+        // Update all nodes with the new color settings
+        this.updateAllNodes();
     }
 }
 

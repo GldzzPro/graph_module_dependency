@@ -18,11 +18,13 @@ export class GraphModelComponent extends Component {
             selectedModels: new Set(),
             maxDepth: 2, // Default max depth
             relationTypeColors: {
-                'many2one': '#red',
+                'many2one': '#ff0000',
                 'one2one': '#97c2fc',
                 'one2many': '#AEFCAB',
                 'many2many': '#fcadb7',
-            }
+            },
+            modelModules: {}, // Map of model IDs to their module information
+            showIcons: true, // Toggle for displaying icons
         });
 
         this.graphNodes = null;
@@ -38,23 +40,62 @@ export class GraphModelComponent extends Component {
             await loadJS("https://cdnjs.cloudflare.com/ajax/libs/vis/4.21.0/vis.min.js");
             await loadCSS("https://cdnjs.cloudflare.com/ajax/libs/vis/4.21.0/vis.min.css");
 
-            // Fetch model data
+            // Fetch model data with module information
             const data = await this.orm.call(
                 'ir.model',
                 'search_read',
                 [],
                 {
-                    fields: ['id', 'name', 'model'],
+                    fields: ['id', 'name', 'model', 'modules'],
                     order: 'name',
                 }
             );
 
-            // Process model data
-            this.state.nodes = data.map(node => ({
-                id: node.id,
-                label: node.name,
-                model: node.model,
-            }));
+            // Fetch module data to get icons
+            const moduleData = await this.orm.call(
+                'ir.module.module',
+                'search_read',
+                [],
+                {
+                    fields: ['id', 'name', 'shortdesc', 'icon', 'icon_image'],
+                }
+            );
+
+            // Create a map of module names to their icons
+            const moduleIcons = {};
+            moduleData.forEach(module => {
+                moduleIcons[module.name] = {
+                    icon: module.icon || `/base/static/img/icons/default_module_icon.png`,
+                    shortdesc: module.shortdesc
+                };
+            });
+
+            // Process model data and associate with modules
+            this.state.nodes = data.map(node => {
+                // Get the first module that provides this model
+                const moduleNames = node.modules ? node.modules.split(', ') : [];
+                const primaryModule = moduleNames.length > 0 ? moduleNames[0] : 'base';
+                const moduleInfo = moduleIcons[primaryModule] || {
+                    icon: `/base/static/img/icons/default_module_icon.png`,
+                    shortdesc: primaryModule
+                };
+
+                // Store module information for this model
+                this.state.modelModules[node.id] = {
+                    moduleName: primaryModule,
+                    moduleIcon: moduleInfo.icon,
+                    moduleDesc: moduleInfo.shortdesc
+                };
+
+                return {
+                    id: node.id,
+                    label: node.name,
+                    model: node.model,
+                    module: primaryModule,
+                    moduleIcon: moduleInfo.icon,
+                    moduleDesc: moduleInfo.shortdesc
+                };
+            });
 
             // Initially, filtered nodes are the same as all nodes
             this.state.filteredNodes = [...this.state.nodes];
@@ -79,6 +120,15 @@ export class GraphModelComponent extends Component {
                             font: {
                                 size: 10,
                                 align: 'middle'
+                            }
+                        },
+                        nodes: {
+                            shape: 'box',
+                            margin: 10,
+                            font: {
+                                size: 12,
+                                face: 'Arial',
+                                multi: 'html'
                             }
                         },
                         physics: {
@@ -149,6 +199,56 @@ export class GraphModelComponent extends Component {
     }
 
     /**
+     * Toggle the display of module icons
+     */
+    toggleIcons() {
+        this.state.showIcons = !this.state.showIcons;
+        
+        // Update all nodes with the new icon setting
+        this.updateAllNodes();
+    }
+
+    /**
+     * Update all nodes in the graph with current settings
+     */
+    updateAllNodes() {
+        if (!this.graphNodes) return;
+        
+        const nodesToUpdate = [];
+        this.graphNodes.forEach(node => {
+            const originalNode = this.state.nodes.find(n => n.id === node.id);
+            if (originalNode) {
+                nodesToUpdate.push(this.createNodeObject(originalNode));
+            }
+        });
+        
+        if (nodesToUpdate.length > 0) {
+            this.graphNodes.update(nodesToUpdate);
+        }
+    }
+
+    /**
+     * Create a node object with proper formatting for the graph
+     * @param {Object} node - The node data
+     * @returns {Object} - Formatted node object for vis.js
+     */
+    createNodeObject(node) {
+        const moduleInfo = this.state.modelModules[node.id];
+        const iconPath = moduleInfo ? moduleInfo.moduleIcon : `/base/static/img/icons/default_module_icon.png`;
+        const moduleDesc = moduleInfo ? moduleInfo.moduleDesc : 'Unknown';
+        
+        const iconHtml = this.state.showIcons ? 
+            `<img src="${iconPath}" width="32" height="32" style="display:block; margin:auto;"><br>` : '';
+        
+        return {
+            id: node.id,
+            label: `${iconHtml}<b>${node.label}</b><br>${node.model}<br><i>Module: ${moduleDesc}</i>`,
+            title: node.model,
+            moduleInfo: moduleInfo
+        };
+    }
+
+    /**
      * Handle filter input for model search
      * @param {Event} event - Input keyup event
      */
@@ -194,15 +294,14 @@ export class GraphModelComponent extends Component {
         // Re-add each previously selected model with the new depth
         for (const model of selectedModels) {
             // Add node back to graph
-            this.graphNodes.update([{
-                id: model.id,
-                label: model.label
-            }]);
-            
-            this.state.selectedModels.add(model.id);
-            
-            // Fetch model relationships with the new depth
-            await this.fetchAndUpdateModelRelations(model.id);
+            const originalNode = this.state.nodes.find(n => n.id === model.id);
+            if (originalNode) {
+                this.graphNodes.update([this.createNodeObject(originalNode)]);
+                this.state.selectedModels.add(model.id);
+                
+                // Fetch model relationships with the new depth
+                await this.fetchAndUpdateModelRelations(model.id);
+            }
         }
     }
     
@@ -222,13 +321,12 @@ export class GraphModelComponent extends Component {
             const nodes = [];
             data.nodes.forEach(node => {
                 if (node.id && !this.state.selectedModels.has(node.id)) {
-                    nodes.push({
-                        id: node.id,
-                        label: node.label,
-                        title: node.model,
-                        state: node.model
-                    });
-                    this.state.selectedModels.add(node.id);
+                    // Find full node info
+                    const originalNode = this.state.nodes.find(n => n.id === node.id);
+                    if (originalNode) {
+                        nodes.push(this.createNodeObject(originalNode));
+                        this.state.selectedModels.add(node.id);
+                    }
                 }
             });
             this.graphNodes.update(nodes);
@@ -275,18 +373,14 @@ export class GraphModelComponent extends Component {
      */
     async onClickModel(event) {
         const modelId = parseInt(event.target.dataset.id);
-        const modelLabel = event.target.dataset.label;
+        const originalNode = this.state.nodes.find(n => n.id === modelId);
 
-        if (!modelId || this.state.selectedModels.has(modelId)) {
+        if (!modelId || this.state.selectedModels.has(modelId) || !originalNode) {
             return;
         }
 
         // Update the graph with the selected model
-        this.graphNodes.update([{
-            id: modelId,
-            label: modelLabel
-        }]);
-
+        this.graphNodes.update([this.createNodeObject(originalNode)]);
         this.state.selectedModels.add(modelId);
 
         // Fetch model relationships with depth limit

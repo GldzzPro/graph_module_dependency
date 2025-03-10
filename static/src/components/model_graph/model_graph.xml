@@ -25,6 +25,21 @@
                             <small class="form-text text-muted">Higher values may impact performance</small>
                         </div>
                         
+                        <!-- Display Options -->
+                        <div class="card mb-3">
+                            <div class="card-header">
+                                <h5 class="mb-0">Display Options</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="showModuleIcons" t-att-checked="state.showIcons" t-on-change="toggleIcons"/>
+                                    <label class="form-check-label" for="showModuleIcons">
+                                        Show Module Logos
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                        
                         <!-- Color Palette Configuration -->
                         <div class="card mb-3">
                             <div class="card-header">
