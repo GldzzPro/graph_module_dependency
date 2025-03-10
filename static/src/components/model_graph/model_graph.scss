@@ -44,12 +44,4 @@ input[type="color"] {
   margin-bottom : 0;
 }
 
-.module_graph_nav .form-group label span {
-  min-width: 80px;
-}
 
-.module_graph_nav .card-body {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap : 5px;
-}

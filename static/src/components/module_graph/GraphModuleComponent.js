@@ -5,7 +5,14 @@ import { registry } from '@web/core/registry';
 import { loadJS, loadCSS } from "@web/core/assets";
 
 const DEFAULT_MODULE_ICON = `/base/static/img/icons/default_module_icon.png`;
-
+const DEFAULT_STATE_COLOR = {
+    'uninstallable': '#eaeaa4',
+    'installed': '#97c2fc',
+    'uninstalled': '#e5f8fc',
+    'to install': '#939afc',
+    'to upgrade': '#AEFCAB',
+    'to remove': '#fcadb7',
+}
 
 export class GraphModuleComponent extends Component {
     static template = "module_graphe_template"; // Refers to our QWeb template
@@ -17,16 +24,9 @@ export class GraphModuleComponent extends Component {
             nodes: [],
             edges: [],
             module_info: {},
-            filteredNodes: [],
             selectedModules: new Set(),
-            stateColors: {
-                'uninstallable': '#eaeaa4',
-                'installed': '#97c2fc',
-                'uninstalled': '#e5f8fc',
-                'to install': '#939afc',
-                'to upgrade': '#AEFCAB',
-                'to remove': '#fcadb7',
-            },
+            stateFilter: {},
+            searchValue: "",
         });
         this.graphNodes = null;
         this.graphEdges = null;
@@ -58,12 +58,15 @@ export class GraphModuleComponent extends Component {
                 state: node.state,
                 shortdesc: node.shortdesc,
                 icon: node.icon || DEFAULT_MODULE_ICON,
+                color: DEFAULT_STATE_COLOR[node.state]
             }));
+            const stateSet = new Set(this.state.nodes.map(node => node.state));
 
+            this.state.stateFilter = Object.fromEntries(
+                Array.from(stateSet).map(state => [state, true])
+            );
+            console.log({ stateSet })
 
-
-            // Initially, filtered nodes are the same as all nodes
-            this.state.filteredNodes = [...this.state.nodes];
         });
 
         onMounted(() => {
@@ -83,9 +86,8 @@ export class GraphModuleComponent extends Component {
                             arrows: 'to',
                         },
                         nodes: {
-                            shape: 'box',
                             margin: 10,
-                            size: 50,
+                            shape: "image",
                             font: {
                                 size: 12,
                                 face: 'Arial',
@@ -124,7 +126,28 @@ export class GraphModuleComponent extends Component {
             }
         });
     }
-
+    /**
+       * Create a node object with proper formatting for the graph
+       * @param {Object} node - The node data
+       * @returns {Object} - Formatted node object for vis.js
+       */
+    createNodeObject(node) {
+        const iconPath = node.icon || DEFAULT_MODULE_ICON;
+        return {
+            id: node.id,
+            label: node.label,
+            color: DEFAULT_STATE_COLOR[node.state],
+            state: node.state,
+            image: iconPath,
+            shapeProperties: {
+                useImageSize: true,
+                useBorderWithImage: false,
+                interpolation: false,
+                coordinateOrigin: "center",
+            },
+            title: node.shortdesc
+        };
+    }
     /**
      * Open the module form view
      * @param {number} moduleId - The ID of the module to display
@@ -140,61 +163,32 @@ export class GraphModuleComponent extends Component {
             res_id: moduleId,
         });
     }
-
-    /**
-     * Handle filter input for module search
-     * @param {Event} event - Input keyup event
-     */
     onInputKeyup(event) {
-        const filter = event.target.value.toUpperCase();
-        // Filter nodes based on search input
-        this.state.filteredNodes = this.state.nodes.filter(node =>
-            node.label.toUpperCase().includes(filter) ||
-            node.shortdesc.toUpperCase().includes(filter)
-        );
-    }
-    /**
-     * Update all nodes in the graph with current settings
-     */
-    updateAllNodes() {
-        if (!this.graphNodes) return;
-        const nodesToUpdate = [];
-        this.graphNodes.forEach(node => {
-            const originalNode = this.state.nodes.find(n => n.id === node.id);
-            if (originalNode) {
-                nodesToUpdate.push(this.createNodeObject(originalNode));
-            }
-        });
-
-        if (nodesToUpdate.length > 0) {
-            this.graphNodes.update(nodesToUpdate);
-        }
+        this.state.searchValue = event.target.value;
     }
 
-    /**
-     * Create a node object with proper formatting for the graph
-     * @param {Object} node - The node data
-     * @returns {Object} - Formatted node object for vis.js
-     */
-    createNodeObject(node) {
-        const iconPath = node.icon || DEFAULT_MODULE_ICON;
-        return {
-            id: node.id,
-            label: node.label,
-            color: this.state.stateColors[node.state],
-            state: node.state,
-            image: iconPath,
-            shape: "circularImage",
-            shapeProperties: {
-                useImageSize: true,
-                useBorderWithImage: false,
-                interpolation: false,
-                coordinateOrigin: "center",
-            },
-            title: node.shortdesc
+    onToggleState(event) {
+        const stateKey = event.target.dataset.state;
+        // Replace the stateFilter object with a new one
+        this.state.stateFilter = {
+            ...this.state.stateFilter,
+            [stateKey]: !this.state.stateFilter[stateKey],
         };
     }
 
+    // A getter that always computes the filtered list from the full nodes array:
+    get filteredNodes() {
+        const search = this.state.searchValue.toUpperCase();
+        const filteredNodes = this.state.nodes.filter(node => {
+            const matchesSearch =
+                node.label.toUpperCase().includes(search) ||
+                node.shortdesc.toUpperCase().includes(search);
+            const matchesState = this.state.stateFilter[node.state];
+            return matchesSearch && matchesState;
+        });
+        console.log({ search, fLength: filteredNodes.length })
+        return filteredNodes;
+    }
     /**
      * Handle clicking on a module in the navigation list
      * @param {Event} event - Click event
@@ -272,21 +266,18 @@ export class GraphModuleComponent extends Component {
     isModuleSelected(moduleId) {
         return this.state.selectedModules.has(moduleId);
     }
-
     /**
-     * Handle color change for a module state
+     * Handle color change for a module
      * @param {Event} event - Change event from the color input
      */
-    onChangeStateColor(event) {
-        const state = event.target.dataset.state;
+    onChangeColor(event) {
         const color = event.target.value;
-
-        // Update the color in state
-        this.state.stateColors[state] = color;
-
-        // Update all nodes with the new color settings
-        this.updateAllNodes();
+        const moduleId = event.target.dataset.id
+        const originalNodeIndex = this.state.nodes.findIndex(node => node.id == moduleId)
+        this.state.nodes[originalNodeIndex].color = color;
+        this.graphNodes.update([this.state.nodes[originalNodeIndex]]);
     }
+
 }
 
 // Register this component as a client action

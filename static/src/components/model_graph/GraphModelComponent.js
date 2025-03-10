@@ -123,7 +123,7 @@ export class GraphModelComponent extends Component {
                             }
                         },
                         nodes: {
-                            shape: 'box',
+                            shape: 'image',
                             margin: 10,
                             font: {
                                 size: 12,
@@ -234,15 +234,11 @@ export class GraphModelComponent extends Component {
      */
     createNodeObject(node) {
         const moduleInfo = this.state.modelModules[node.id];
-        const iconPath = moduleInfo ? moduleInfo.moduleIcon : `/base/static/img/icons/default_module_icon.png`;
-        const moduleDesc = moduleInfo ? moduleInfo.moduleDesc : 'Unknown';
-        
-        const iconHtml = this.state.showIcons ? 
-            `<img src="${iconPath}" width="32" height="32" style="display:block; margin:auto;"><br>` : '';
-        
+        const iconPath = moduleInfo ? moduleInfo.moduleIcon : `/base/static/img/icons/default_module_icon.png`;      
         return {
             id: node.id,
-            label: `${iconHtml}<b>${node.label}</b><br>${node.model}<br><i>Module: ${moduleDesc}</i>`,
+            label: node.label,
+            image: iconPath,
             title: node.model,
             moduleInfo: moduleInfo
         };

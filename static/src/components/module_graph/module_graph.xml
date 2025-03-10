@@ -3,14 +3,15 @@
     <t t-name="module_graphe_template">
         <div class="o_module_graph">
             <div class="row">
-            
+
                 <div class="col-md-3">
                     <div class="module_graph_nav">
                         <div class="input-group mb-3">
-                            <input type="text" class="form-control" placeholder="Search modules..." t-on-keyup="onInputKeyup"/>
+                            <input type="text" class="form-control" placeholder="Search modules..."
+                                t-on-keyup="onInputKeyup" />
                             <div class="input-group-append">
                                 <span class="input-group-text">
-                                    <i class="fa fa-search"/>
+                                    <i class="fa fa-search" />
                                 </span>
                             </div>
                         </div>
@@ -20,28 +21,31 @@
                                 <h5 class="mb-0">State Color Configuration</h5>
                             </div>
                             <div class="card-body">
-                                <div class="form-group" t-foreach="Object.keys(state.stateColors)" t-as="stateType" t-key="stateType">
+                                <div class="form-group" t-foreach="Object.keys(state.stateFilter)" t-as="stateType"
+                                    t-key="stateType">
                                     <label>
-                                        <span t-esc="stateType" class="mr-2"/>
-                                        <input 
-                                            type="color" 
-                                            class="form-control form-control-sm" 
-                                            t-att-value="state.stateColors[stateType]" 
-                                            t-att-data-state="stateType"
-                                            t-on-change="onChangeStateColor"/>
+                                        <span t-esc="stateType" class="mr-2" />
+                                        <label class="switch">
+                                            <input type="checkbox" t-att-checked="state.stateFilter[stateType]"
+                                                t-on-change="onToggleState" t-att-data-state="stateType" />
+                                            <span class="slider round" />
+                                        </label>
                                     </label>
                                 </div>
                             </div>
                         </div>
-                        
                         <ul class="list-group module_graph_nav_list">
-                            <t t-foreach="state.filteredNodes" t-as="node" t-key="node.id">
+                            <t t-foreach="filteredNodes" t-as="node" t-key="node.id">
                                 <li t-att-class="isModuleSelected(node.id) ? 'list-group-item module_selected' : 'list-group-item'"
-                                    t-att-data-id="node.id"
-                                    t-att-data-label="node.label"
-                                    t-on-click="onClickModule">
-                                    <img t-att-src="node.icon"  t-attf-class="rounded-circle o_object_fit_cover" width="24" height="24"/>
-                                    <t t-esc="node.shortdesc"/> (<t t-esc="node.label"/>)
+                                    t-att-data-id="node.id" t-att-data-label="node.label" t-on-click="onClickModule">
+                                    <img t-att-src="node.icon" t-attf-class="rounded-circle o_object_fit_cover"
+                                        width="24" height="24" />
+                                    <label class="list-desc">
+                                        <t t-esc="node.shortdesc" /> (
+                                        <t t-esc="node.label" />)
+                                    </label>
+                                    <input type="color" class="form-control form-control-sm" t-att-value="node.color"
+                                        t-att-data-id="node.id" t-on-change="onChangeColor" />
                                 </li>
                             </t>
                         </ul>
@@ -50,7 +54,7 @@
 
 
                 <div class="col-md-9">
-                    <div class="module_graph_container border" t-ref="graph" style="height: 600px;"/>
+                    <div class="module_graph_container border" t-ref="graph" style="height: 600px;" />
                 </div>
             </div>
         </div>
