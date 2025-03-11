@@ -5,6 +5,7 @@ import { registry } from '@web/core/registry';
 import { loadJS, loadCSS } from "@web/core/assets";
 
 const DEFAULT_MODULE_ICON = `/base/static/img/icons/default_module_icon.png`;
+
 const DEFAULT_STATE_COLOR = {
     'uninstallable': '#eaeaa4',
     'installed': '#97c2fc',
@@ -14,8 +15,24 @@ const DEFAULT_STATE_COLOR = {
     'to remove': '#fcadb7',
 }
 
+const DEFAULT_NETWORK_OPTIONS = {
+    edges: {
+        arrows: 'to',
+    },
+    nodes: {
+        margin: 10,
+        shape: "image",
+        size: 20,
+        font: {
+            size: 12,
+            face: 'Arial',
+            multi: 'html'
+        }
+    }
+}
+
 export class GraphModuleComponent extends Component {
-    static template = "module_graphe_template"; // Refers to our QWeb template
+    static template = "module_graphe_template";
 
     static props = {};
 
@@ -27,6 +44,13 @@ export class GraphModuleComponent extends Component {
             selectedModules: new Set(),
             stateFilter: {},
             searchValue: "",
+            maxDepth: 3,
+            stopOnInstalled: false,
+            stopOnCategory: null,
+            stopOnNonCustom: false,
+            customFilter: null,
+            graph: null,
+            loading: false,
         });
         this.graphNodes = null;
         this.graphEdges = null;
@@ -54,18 +78,16 @@ export class GraphModuleComponent extends Component {
             // Process module data
             this.state.nodes = data.map(node => ({
                 id: node.id,
-                label: node.name,
+                label: `${node.name} - ${node.id}`,
                 state: node.state,
                 shortdesc: node.shortdesc,
                 icon: node.icon || DEFAULT_MODULE_ICON,
                 color: DEFAULT_STATE_COLOR[node.state]
             }));
             const stateSet = new Set(this.state.nodes.map(node => node.state));
-
             this.state.stateFilter = Object.fromEntries(
                 Array.from(stateSet).map(state => [state, true])
             );
-            console.log({ stateSet })
 
         });
 
@@ -81,20 +103,7 @@ export class GraphModuleComponent extends Component {
                         nodes: this.graphNodes,
                         edges: this.graphEdges
                     },
-                    {
-                        edges: {
-                            arrows: 'to',
-                        },
-                        nodes: {
-                            margin: 10,
-                            shape: "image",
-                            font: {
-                                size: 12,
-                                face: 'Arial',
-                                multi: 'html'
-                            }
-                        }
-                    }
+                    DEFAULT_NETWORK_OPTIONS
                 );
                 // Set up network event handlers
                 this.setupNetworkEvents();
@@ -140,10 +149,10 @@ export class GraphModuleComponent extends Component {
             state: node.state,
             image: iconPath,
             shapeProperties: {
-                useImageSize: true,
-                useBorderWithImage: false,
-                interpolation: false,
+                useBorderWithImage: true,
+                interpolation: true,
                 coordinateOrigin: "center",
+                borderRadius: 10,
             },
             title: node.shortdesc
         };
@@ -186,7 +195,6 @@ export class GraphModuleComponent extends Component {
             const matchesState = this.state.stateFilter[node.state];
             return matchesSearch && matchesState;
         });
-        console.log({ search, fLength: filteredNodes.length })
         return filteredNodes;
     }
     /**
@@ -204,14 +212,42 @@ export class GraphModuleComponent extends Component {
         // Update the graph with the selected module
         this.graphNodes.update([this.createNodeObject(moduleNode)]);
         this.state.selectedModules.add(moduleId);
+        this.state.loading = true;
 
         // Fetch module dependencies
         try {
+            // Build options object with stop conditions
+            const options = {};
+
+            if (this.state.maxDepth > 0) {
+                options.max_depth = this.state.maxDepth;
+            }
+
+            if (this.state.stopOnInstalled) {
+                options.stop_on_installed = true;
+            }
+
+            if (this.state.stopOnCategory) {
+                options.stop_on_category = this.state.stopOnCategory;
+            }
+
+            if (this.state.stopOnNonCustom) {
+                options.stop_on_non_custom = true;
+            }
+
+            if (this.state.customFilter) {
+                options.custom_filter = this.state.customFilter;
+            }
+
+            // Call the server method with the options
             const data = await this.orm.call(
                 'ir.module.module',
                 'get_module_graph',
-                [moduleId]
+                [moduleId],
+                { options }
             );
+
+            console.log({ data })
 
             // Process and add nodes to the graph
             const nodes = [];
@@ -233,7 +269,7 @@ export class GraphModuleComponent extends Component {
                 const existingEdge = this.state.edges.find(e =>
                     e.from === edge.from && e.to === edge.to
                 );
-
+                console.log({ edge, existingEdge })
                 if (!existingEdge) {
                     const newEdge = {
                         from: edge.from,
@@ -253,9 +289,57 @@ export class GraphModuleComponent extends Component {
             });
 
             this.graphEdges.update(edges);
+
+            console.log({ stateEdges: this.graphEdges, dataEdges: data.edges, edges })
         } catch (error) {
             console.error("Error fetching module graph data:", error);
+        } finally {
+            this.state.loading = false;
+
         }
+    }
+
+
+    /**
+     * Updates max depth setting
+     * @param {Event} event Change event from input
+     */
+    onChangeMaxDepth(event) {
+        this.state.maxDepth = parseInt(event.target.value, 10) || 0;
+    }
+
+    /**
+     * Toggles stop on installed flag
+     */
+    toggleStopOnInstalled() {
+        this.state.stopOnInstalled = !this.state.stopOnInstalled;
+    }
+
+    /**
+     * Sets category stop condition
+     * @param {Object} category Category to stop on
+     */
+    setStopCategory(category) {
+        this.state.stopOnCategory = category.id;
+    }
+
+    /**
+     * Clears all stop conditions
+     */
+    clearStopConditions() {
+        this.state.maxDepth = 0;
+        this.state.stopOnInstalled = false;
+        this.state.stopOnCategory = null;
+        this.state.stopOnNonCustom = false;
+        this.state.customFilter = null;
+    }
+
+    /**
+     * Sets a custom domain filter
+     * @param {Array} domain Odoo domain filter
+     */
+    setCustomFilter(domain) {
+        this.state.customFilter = domain;
     }
 
     /**
@@ -276,6 +360,13 @@ export class GraphModuleComponent extends Component {
         const originalNodeIndex = this.state.nodes.findIndex(node => node.id == moduleId)
         this.state.nodes[originalNodeIndex].color = color;
         this.graphNodes.update([this.state.nodes[originalNodeIndex]]);
+    }
+
+    onClearGraph() {
+        this.graphEdges.clear()
+        this.graphNodes.clear()
+        this.state.selectedModules = new Set()
+        this.state.edges = []
     }
 
 }

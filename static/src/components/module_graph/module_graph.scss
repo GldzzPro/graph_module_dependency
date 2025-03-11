@@ -29,12 +29,21 @@
   gap: 5px;
 }
 
-.list-group.module_graph_nav_list .list-group-item {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  justify-content: space-between;
+.list-group {
+  &.module_graph_nav_list {
+    .list-group-item {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+
+      // Conditionally apply space-between when the third child is also the last child
+      &:has(:nth-child(3):last-child) {
+        justify-content: space-between;
+      }
+    }
+  }
 }
+
 
 .list-desc {
   text-wrap: nowrap;

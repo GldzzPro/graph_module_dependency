@@ -18,7 +18,7 @@
                         <!-- Color Palette Configuration -->
                         <div class="card mb-3">
                             <div class="card-header">
-                                <h5 class="mb-0">State Color Configuration</h5>
+                                <h5 class="mb-0">State Filter</h5>
                             </div>
                             <div class="card-body">
                                 <div class="form-group" t-foreach="Object.keys(state.stateFilter)" t-as="stateType"
@@ -44,9 +44,14 @@
                                         <t t-esc="node.shortdesc" /> (
                                         <t t-esc="node.label" />)
                                     </label>
-                                    <input type="color" class="form-control form-control-sm" t-att-value="node.color"
-                                        t-att-data-id="node.id" t-on-change="onChangeColor" />
+                                    <!-- Only display the color input when node.color exists -->
+                                    <t t-if="isModuleSelected(node.id)">
+                                        <input type="color" class="form-control form-control-sm"
+                                            t-att-value="node.color" t-att-data-id="node.id"
+                                            t-on-change="onChangeColor" />
+                                    </t>
                                 </li>
+
                             </t>
                         </ul>
                     </div>
@@ -54,6 +59,51 @@
 
 
                 <div class="col-md-9">
+                    <div class="o_module_graph_controls mb-3">
+                        <div class="row mt-3">
+                            <div class="col-12">
+                                <h5>Stop Conditions</h5>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="form-group">
+                                    <label for="maxDepth">Maximum Depth</label>
+                                    <input type="number" class="form-control" id="maxDepth" t-att-value="state.maxDepth"
+                                        t-on-change="onChangeMaxDepth" min="0" />
+                                    <small class="text-muted">0 means no limit</small>
+                                </div>
+                            </div>
+
+                            <div class="col-md-4">
+                                <div class="form-check mt-4">
+                                    <input class="form-check-input" type="checkbox" id="stopOnInstalled"
+                                        t-att-checked="state.stopOnInstalled" t-on-change="toggleStopOnInstalled" />
+                                    <label class="form-check-label" for="stopOnInstalled">
+                                        Stop on installed modules
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div class="col-md-4">
+                                <div class="form-check mt-4">
+                                    <input class="form-check-input" type="checkbox" id="stopOnNonCustom"
+                                        t-att-checked="state.stopOnNonCustom"
+                                        t-on-change="() => this.state.stopOnNonCustom = !this.state.stopOnNonCustom" />
+                                    <label class="form-check-label" for="stopOnNonCustom">
+                                        Stop on non-custom modules
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row mt-3">
+                            <div class="col-md-12">
+                                <button class="btn btn-danger" t-on-click="onClearGraph">clear graph</button>
+                                <button class="btn btn-secondary ml-2" t-on-click="clearStopConditions">
+                                    Clear Stop Conditions
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                     <div class="module_graph_container border" t-ref="graph" style="height: 600px;" />
                 </div>
             </div>
