@@ -16,7 +16,10 @@
     ],
     "assets": {
         "web.assets_backend": [
-            "graph_module_dependency/static/src/components/module_graph/GraphModuleComponent.js",
+            "graph_module_dependency/static/src/components/module_graph/GraphOptions.js",
+            "graph_module_dependency/static/src/components/module_graph/ModuleSelector.js",
+            "graph_module_dependency/static/src/components/module_graph/ModulesGraphPage.js",
+            "graph_module_dependency/static/src/components/module_graph/ModulesGraphView.js",
             "graph_module_dependency/static/src/components/model_graph/GraphModelComponent.js",
             "graph_module_dependency/static/src/components/module_graph/module_graph.xml",
             "graph_module_dependency/static/src/components/model_graph/model_graph.scss",
