@@ -168,7 +168,8 @@ export class ModulesGraphPage extends Component {
      */
     clearGraph() {
         this.state.selectedModuleIds = new Set();
-        this.state.graphData = { nodes: [], edges: [] };
+        this.state.graphData.nodes.update(nodes);
+        this.state.graphData.edges.update(edges);
         debugger;
     }
 
@@ -212,7 +213,9 @@ export class ModulesGraphPage extends Component {
                 { options }
             );
 
-            this.state.graphData = this.processGraphData(data);
+            const { nodes, edges } = this.processGraphData(data);
+            this.state.graphData.nodes.update(nodes);
+            this.state.graphData.edges.update(edges);
         } catch (error) {
             console.error("Error updating graph:", error);
         } finally {

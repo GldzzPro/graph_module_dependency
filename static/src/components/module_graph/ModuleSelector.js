@@ -55,7 +55,6 @@ export class ModuleSelector extends Component {
      */
     isModuleSelected(moduleId) {
         const result = this.props.selectedModuleIds.has(moduleId);
-        debugger;
         return result;
     }
 }
