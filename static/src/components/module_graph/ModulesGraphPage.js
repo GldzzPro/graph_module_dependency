@@ -205,6 +205,9 @@ export class ModulesGraphPage extends Component {
             // Convert graph options to server format
             const options = this.prepareGraphOptions();
 
+            console.log("Fetching graph data with options:", options);
+            console.log("Selected module IDs:", selectedModuleIds);
+
             // Fetch graph data
             const data = await this.orm.call(
                 'ir.module.module',
@@ -213,15 +216,22 @@ export class ModulesGraphPage extends Component {
                 { options }
             );
 
-            const { nodes, edges } = this.processGraphData(data);
-            this.state.graphData.nodes.update(nodes);
-            this.state.graphData.edges.update(edges);
+            console.log("Received graph data:", data);
+
+            // Process the data to ensure it has the right format
+            const processed = this.processGraphData(data);
+
+            // Important: Set the state in a single update to trigger a single re-render
+            this.state.graphData = processed;
+
+            console.log("Processed graph data:", this.state.graphData);
         } catch (error) {
             console.error("Error updating graph:", error);
+            // Set empty data on error
+            this.state.graphData = { nodes: [], edges: [] };
         } finally {
             this.state.loading = false;
         }
-        debugger;
     }
 
     /**

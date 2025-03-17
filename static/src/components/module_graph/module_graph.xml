@@ -125,9 +125,12 @@
         </div>
     </t>
 
-    <!-- Modules Graph View Template -->
+    <!-- Modules Graph View Template with explicit height -->
     <t t-name="modules_graph_view_template">
-        <div t-ref="graph" class="h-100 w-100"></div>
+        <div class="d-flex flex-column h-100">
+            <div t-ref="graph" class="graph-container flex-grow-1" style="height: 500px; min-height: 500px;"></div>
+
+        </div>
     </t>
 
 </templates>
