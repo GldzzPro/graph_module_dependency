@@ -1,4 +1,4 @@
-from odoo import models, api, fields
+from odoo import models, api
 
 
 class Module(models.Model):
@@ -11,29 +11,25 @@ class Module(models.Model):
 
         Args:
             module_ids (list): List of module IDs to generate the graph for
-            options (dict, optional): Dictionary containing stop conditions:
+            options (dict, optional): Dictionary containing graph options:
                 - max_depth (int): Maximum recursion depth
-                - stop_on_installed (bool): Stop when an installed module is found
-                - stop_on_uninstallable (bool): Stop when an uninstallable module is found
-                - stop_on_category (str/int): Stop when a module with this category is found
-                - stop_on_non_custom (bool): Stop when a non-custom module is found
-                - custom_filter (dict): Custom domain filter to stop recursion
+                - stop_conditions (list): List of condition objects:
+                    [{'type': 'installed', 'value': True},
+                     {'type': 'category', 'value': category_id},
+                     {'type': 'non_custom', 'value': True},
+                     {'type': 'custom_domain', 'value': [domain_expr]}]
                 - current_depth (int): Current recursion depth (used internally)
 
         Returns:
             dict: Dictionary containing nodes and edges of the graph
         """
-        if options is None:
-            options = {}
-
-        if "current_depth" not in options:
-            options["current_depth"] = 0
-
-        # Get the max depth (default to no limit if not specified)
+        options = options or {}
+        current_depth = options.get("current_depth", 0)
         max_depth = options.get("max_depth", False)
+        stop_conditions = options.get("stop_conditions", [])
 
         # Check if we've reached the maximum depth
-        if max_depth and options["current_depth"] >= max_depth:
+        if max_depth and current_depth >= max_depth:
             return {"nodes": [], "edges": []}
 
         nodes = []
@@ -52,7 +48,7 @@ class Module(models.Model):
                 "id": module.id,
                 "label": module.name,
                 "state": module.state,
-                "depth": options["current_depth"],
+                "depth": current_depth,
             }
 
             # Add category information if available
@@ -66,51 +62,13 @@ class Module(models.Model):
 
             nodes.append(module_data)
 
-            # Check stop conditions for the current module
-            should_stop = False
-
-            if options.get("stop_on_installed") and module.state == "installed":
-                should_stop = True
-
-            elif (
-                options.get("stop_on_uninstallable") and module.state == "uninstallable"
-            ):
-                should_stop = True
-
-            elif options.get("stop_on_category") and hasattr(module, "category_id"):
-                category_value = options.get("stop_on_category")
-                if (
-                    isinstance(category_value, str)
-                    and module.category_id.name == category_value
-                ) or (
-                    isinstance(category_value, int)
-                    and module.category_id.id == category_value
-                ):
-                    should_stop = True
-
-            elif (
-                options.get("stop_on_non_custom")
-                and hasattr(module, "is_custom")
-                and not module.is_custom
-            ):
-                should_stop = True
-
-            elif options.get("custom_filter"):
-                # Apply custom domain filter
-                custom_filter = options.get("custom_filter")
-                matching_modules = self.env["ir.module.module"].search(
-                    [("id", "=", module.id)] + custom_filter
-                )
-                if matching_modules:
-                    should_stop = True
-
-            # If we should stop at this module, don't traverse its dependencies
-            if should_stop:
+            # Check if we should stop recursion based on stop conditions
+            if self._should_stop_recursion(module, stop_conditions):
                 continue
 
             # Process dependencies with incremented depth
             dependency_options = dict(options)
-            dependency_options["current_depth"] = options["current_depth"] + 1
+            dependency_options["current_depth"] = current_depth + 1
 
             # Process dependencies
             dependency_modules = []
@@ -147,3 +105,59 @@ class Module(models.Model):
         )
 
         return {"nodes": unique_nodes, "edges": unique_edges}
+
+    def _should_stop_recursion(self, module, stop_conditions):
+        """
+        Check if recursion should stop based on the given stop conditions.
+
+        Args:
+            module: The module record to check
+            stop_conditions: List of condition objects
+
+        Returns:
+            bool: True if recursion should stop, False otherwise
+        """
+        if not stop_conditions:
+            return False
+
+        # Check each stop condition
+        for condition in stop_conditions:
+            condition_type = condition.get("type")
+            condition_value = condition.get("value")
+
+            if not condition_type:
+                continue
+
+            # Check condition based on type
+            if condition_type == "installed" and module.state == "installed":
+                return True
+
+            elif condition_type == "uninstallable" and module.state == "uninstallable":
+                return True
+
+            elif condition_type == "category" and hasattr(module, "category_id"):
+                if (
+                    isinstance(condition_value, str)
+                    and module.category_id.name == condition_value
+                ) or (
+                    isinstance(condition_value, int)
+                    and module.category_id.id == condition_value
+                ):
+                    return True
+
+            elif (
+                condition_type == "non_custom"
+                and hasattr(module, "is_custom")
+                and not module.is_custom
+            ):
+                return True
+
+            elif condition_type == "custom_domain":
+                # Apply custom domain filter
+                matching_modules = self.env["ir.module.module"].search(
+                    [("id", "=", module.id)] + condition_value
+                )
+                if matching_modules:
+                    return True
+
+        return False

@@ -1,163 +1,103 @@
 from odoo import models, api
 
 
-class Module(models.Model):
-    _inherit = "ir.module.module"
+class Model(models.Model):
+    _inherit = "ir.model"
 
-    @api.model
-    def get_module_graph(self, module_ids, options=None):
+    def get_model_relation_graph(
+        self, max_depth=2, current_depth=0, visited_models=None
+    ):
         """
-        Generate a dependency graph for the specified module IDs with custom stop conditions.
+        Generate a graph representation of model relations based on foreign keys.
+        Returns a dictionary with nodes and edges similar to module dependency graph.
 
-        Args:
-            module_ids (list): List of module IDs to generate the graph for
-            options (dict, optional): Dictionary containing graph options:
-                - max_depth (int): Maximum recursion depth
-                - stop_conditions (list): List of condition objects:
-                    [{'type': 'installed', 'value': True},
-                     {'type': 'category', 'value': category_id},
-                     {'type': 'non_custom', 'value': True},
-                     {'type': 'custom_domain', 'value': [domain_expr]}]
-                - current_depth (int): Current recursion depth (used internally)
+        Parameters:
+            max_depth (int): Maximum recursion depth to prevent infinite loops
+            current_depth (int): Current recursion depth (used internally)
+            visited_models (set): Set of already visited model IDs to prevent cycles
 
         Returns:
-            dict: Dictionary containing nodes and edges of the graph
+            dict: Dictionary with 'nodes' and 'edges' lists representing the graph
         """
-        options = options or {}
-        current_depth = options.get("current_depth", 0)
-        max_depth = options.get("max_depth", False)
-        stop_conditions = options.get("stop_conditions", [])
-
-        # Check if we've reached the maximum depth
-        if max_depth and current_depth >= max_depth:
-            return {"nodes": [], "edges": []}
+        # Initialize visited_models set if not provided
+        if visited_models is None:
+            visited_models = set()
 
         nodes = []
         edges = []
 
-        # Get modules by IDs
-        modules = (
-            self.browse(module_ids)
-            if isinstance(module_ids, list)
-            else self.browse([module_ids])
-        )
-
-        for module in modules:
-            # Add the current module to nodes
-            module_data = {
-                "id": module.id,
-                "label": module.name,
-                "state": module.state,
-                "depth": current_depth,
-            }
-
-            # Add category information if available
-            if hasattr(module, "category_id") and module.category_id:
-                module_data["category"] = module.category_id.name
-                module_data["category_id"] = module.category_id.id
-
-            # Add custom flag if available
-            if hasattr(module, "is_custom"):
-                module_data["is_custom"] = module.is_custom
-
-            nodes.append(module_data)
-
-            # Check if we should stop recursion based on stop conditions
-            if self._should_stop_recursion(module, stop_conditions):
+        for model in self:
+            # Skip if we've already visited this model to prevent cycles
+            if model.id in visited_models:
                 continue
 
-            # Process dependencies with incremented depth
-            dependency_options = dict(options)
-            dependency_options["current_depth"] = current_depth + 1
+            # Add current model to visited set
+            visited_models.add(model.id)
 
-            # Process dependencies
-            dependency_modules = []
-            for dependency in module.dependencies_id:
-                depended_module = dependency.depend_id
-                dependency_modules.append(depended_module.id)
-                edges.append(
-                    {"from": module.id, "to": depended_module.id, "type": "dependency"}
-                )
+            # Add current model as a node
+            nodes.append(
+                {
+                    "id": model.id,
+                    "label": model.name,
+                    "model": model.model,
+                }
+            )
 
-            if dependency_modules:
-                res = self.get_module_graph(dependency_modules, dependency_options)
-                nodes.extend(res["nodes"])
-                edges.extend(res["edges"])
+            # Stop recursion if we've reached max depth
+            if current_depth >= max_depth:
+                continue
 
-            # Process exclusions with the same approach
-            exclusion_modules = []
-            for exclusion in module.exclusion_ids:
-                excluded_module = exclusion.exclusion_id
-                exclusion_modules.append(excluded_module.id)
-                edges.append(
-                    {"from": module.id, "to": excluded_module.id, "type": "exclusion"}
-                )
+            # Get all fields of this model that are relational
+            relational_fields = self.env["ir.model.fields"].search(
+                [
+                    ("model_id", "=", model.id),
+                    ("ttype", "in", ["many2one", "one2many", "many2many"]),
+                ]
+            )
 
-            if exclusion_modules:
-                res = self.get_module_graph(exclusion_modules, dependency_options)
-                nodes.extend(res["nodes"])
-                edges.extend(res["edges"])
+            # Process each relational field
+            for field in relational_fields:
+                # Get the target model
+                if field.relation:
+                    target_model = self.env["ir.model"].search(
+                        [("model", "=", field.relation)], limit=1
+                    )
+                    if target_model:
+                        # Add the target model as a node only if it wasn't already visited
+                        if target_model.id not in visited_models:
+                            nodes.append(
+                                {
+                                    "id": target_model.id,
+                                    "label": target_model.name,
+                                    "model": target_model.model,
+                                }
+                            )
 
-        # De-duplicate nodes and edges
+                        # Add an edge between current model and target model
+                        edge_key = f"{model.id}-{target_model.id}"
+                        edges.append(
+                            {
+                                "from": model.id,
+                                "to": target_model.id,
+                                "field": field.name,
+                                "type": field.ttype,
+                            }
+                        )
+
+                        # Recursively get related models with increased depth
+                        if target_model.id not in visited_models:
+                            res = target_model.get_model_relation_graph(
+                                max_depth=max_depth,
+                                current_depth=current_depth + 1,
+                                visited_models=visited_models,
+                            )
+                            nodes.extend(res["nodes"])
+                            edges.extend(res["edges"])
+
+        # Ensure uniqueness of nodes and edges
         unique_nodes = list({node["id"]: node for node in nodes}.values())
         unique_edges = list(
             {"%s-%s" % (edge["from"], edge["to"]): edge for edge in edges}.values()
         )
 
         return {"nodes": unique_nodes, "edges": unique_edges}
-
-    def _should_stop_recursion(self, module, stop_conditions):
-        """
-        Check if recursion should stop based on the given stop conditions.
-
-        Args:
-            module: The module record to check
-            stop_conditions: List of condition objects
-
-        Returns:
-            bool: True if recursion should stop, False otherwise
-        """
-        if not stop_conditions:
-            return False
-
-        # Check each stop condition
-        for condition in stop_conditions:
-            condition_type = condition.get("type")
-            condition_value = condition.get("value")
-
-            if not condition_type:
-                continue
-
-            # Check condition based on type
-            if condition_type == "installed" and module.state == "installed":
-                return True
-
-            elif condition_type == "uninstallable" and module.state == "uninstallable":
-                return True
-
-            elif condition_type == "category" and hasattr(module, "category_id"):
-                if (
-                    isinstance(condition_value, str)
-                    and module.category_id.name == condition_value
-                ) or (
-                    isinstance(condition_value, int)
-                    and module.category_id.id == condition_value
-                ):
-                    return True
-
-            elif (
-                condition_type == "non_custom"
-                and hasattr(module, "is_custom")
-                and not module.is_custom
-            ):
-                return True
-
-            elif condition_type == "custom_domain":
-                # Apply custom domain filter
-                matching_modules = self.env["ir.module.module"].search(
-                    [("id", "=", module.id)] + condition_value
-                )
-                if matching_modules:
-                    return True
-
-        return False
