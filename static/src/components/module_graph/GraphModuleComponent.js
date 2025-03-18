@@ -51,11 +51,30 @@ export class GraphModuleComponent extends Component {
             customFilter: null,
             graph: null,
             loading: false,
+            // Available states and categories with counts
+            availableStates: new Map(),
+            availableCategories: new Map(),
+            // Selected states and categories
+            selectedStates: [],
+            selectedCategories: [],
+            // Filter modes (include = true, exclude = false)
+            stateFilterMode: true,     // Default is "is one of" (include)
+            categoryFilterMode: true,  // Default is "is one of" (include)
+            // Application filter: null = all, true = only apps, false = non-apps
+            applicationFilter: null,
+            moduleTypeFilter : null , 
+            // Combined domain for filtering
+            domain: [],
+            // UI states for dropdowns
+            stateDropdownOpen: false,
+            categoryDropdownOpen: false,
         });
         this.graphNodes = null;
         this.graphEdges = null;
         this.network = null;
         this.containerRef = useRef("graph");
+        this.dropdownStateRef = useRef("dropdownState");
+        this.dropdownCategoryRef = useRef("dropdownCategory");
         this.orm = useService("orm");
         this.action = useService("action");
 
@@ -70,17 +89,15 @@ export class GraphModuleComponent extends Component {
                 'search_read',
                 [],
                 {
-                    fields: ['id', 'name', 'shortdesc', 'state', 'icon'],
+                    fields: ['id', 'name', 'shortdesc', 'state', 'icon', 'category_id', 'application' , 'module_type'],
                     order: 'shortdesc',
                 }
             );
 
             // Process module data
             this.state.nodes = data.map(node => ({
-                id: node.id,
+                ...node,
                 label: `${node.name} - ${node.id}`,
-                state: node.state,
-                shortdesc: node.shortdesc,
                 icon: node.icon || DEFAULT_MODULE_ICON,
                 color: DEFAULT_STATE_COLOR[node.state]
             }));
@@ -88,6 +105,39 @@ export class GraphModuleComponent extends Component {
             this.state.stateFilter = Object.fromEntries(
                 Array.from(stateSet).map(state => [state, true])
             );
+            // Extract unique states with counts
+            const stateMap = new Map();
+            // Extract unique categories with counts
+            const categoryMap = new Map();
+
+            for (const module of this.state.nodes) {
+                // Process states
+                const state = module.state;
+                if (stateMap.has(state)) {
+                    stateMap.set(state, stateMap.get(state) + 1);
+                } else {
+                    stateMap.set(state, 1);
+                }
+
+                // Process categories
+                if (module.category_id && module.category_id.length === 2) {
+                    const [categoryId, categoryName] = module.category_id;
+                    if (categoryMap.has(categoryId)) {
+                        categoryMap.set(categoryId, {
+                            name: categoryName,
+                            count: categoryMap.get(categoryId).count + 1
+                        });
+                    } else {
+                        categoryMap.set(categoryId, {
+                            name: categoryName,
+                            count: 1
+                        });
+                    }
+                }
+            }
+
+            this.state.availableStates = stateMap;
+            this.state.availableCategories = categoryMap;
 
         });
 
@@ -188,7 +238,138 @@ export class GraphModuleComponent extends Component {
             [stateKey]: !this.state.stateFilter[stateKey],
         };
     }
+    // Toggle dropdown visibility
+    toggleDropdown(type) {
+        if (type === 'state') {
+            this.state.stateDropdownOpen = !this.state.stateDropdownOpen;
+            if (this.state.stateDropdownOpen) {
+                this.state.categoryDropdownOpen = false;
+            }
+        } else if (type === 'category') {
+            this.state.categoryDropdownOpen = !this.state.categoryDropdownOpen;
+            if (this.state.categoryDropdownOpen) {
+                this.state.stateDropdownOpen = false;
+            }
+        }
+    }
 
+    // Toggle filter mode (include/exclude)
+    toggleFilterMode(type) {
+        if (type === 'state') {
+            this.state.stateFilterMode = !this.state.stateFilterMode;
+        } else if (type === 'category') {
+            this.state.categoryFilterMode = !this.state.categoryFilterMode;
+        }
+        this.updateDomain();
+    }
+    // Set application filter
+    setApplicationFilter(value) {
+        // value can be: null (all), true (only apps), false (non-apps)
+        this.state.applicationFilter = value;
+        this.updateDomain();
+    }
+    // Set application filter
+    setModuleTypeFilter(value) {
+        // value can be: null (all), true (only apps), false (non-apps)
+        this.state.moduleTypeFilter = value;
+        this.updateDomain();
+    }
+
+    // Toggle selection for a filter item
+    toggleSelection(type, value) {
+        let targetArray;
+        if (type === 'state') {
+            targetArray = this.state.selectedStates;
+        } else if (type === 'category') {
+            targetArray = this.state.selectedCategories;
+        }
+
+        const index = targetArray.indexOf(value);
+        if (index > -1) {
+            targetArray.splice(index, 1);
+        } else {
+            targetArray.push(value);
+        }
+
+        this.updateDomain();
+    }
+
+    // Clear all selections for a filter type
+    clearSelections(type) {
+        if (type === 'state') {
+            this.state.selectedStates = [];
+        } else if (type === 'category') {
+            this.state.selectedCategories = [];
+        }
+
+        this.updateDomain();
+    }
+
+    // Get the operator based on filter mode
+    getOperator(isIncludeMode) {
+        return isIncludeMode ? 'in' : 'not in';
+    }
+
+    // Count modules that match the application filter
+    getApplicationFilterCount(filterValue) {
+        if (filterValue === null) {
+            return this.state.nodes.length;
+        }
+        return this.state.nodes.filter(module => module.application === filterValue).length;
+    }
+    getModuleTypeFilterCount(filterValue) {
+        if (filterValue === null) {
+            return this.state.nodes.length;
+        }
+        return this.state.nodes.filter(module => module.module_type === filterValue).length;
+    }
+
+
+    // Update domain based on selected filters
+    updateDomain() {
+        const domain = [];
+
+        // Add state conditions if any selected
+        if (this.state.selectedStates.length > 0) {
+            const operator = this.getOperator(this.state.stateFilterMode);
+            domain.push(['state', operator, this.state.selectedStates]);
+        }
+
+        // Add category conditions if any selected
+        if (this.state.selectedCategories.length > 0) {
+            const operator = this.getOperator(this.state.categoryFilterMode);
+            domain.push(['category_id', operator, this.state.selectedCategories]);
+        }
+
+        // Add application filter if set
+        if (this.state.applicationFilter !== null) {
+            domain.push(['application', '=', this.state.applicationFilter]);
+        }
+
+        //add module_type filter if set 
+        if (this.state.moduleTypeFilter !== null) {
+            domain.push(['module_type', '=', this.state.moduleTypeFilter]);
+        }
+
+        this.state.domain = domain;
+    }
+    // String representation of the domain for debugging
+    stringifyDomain() {
+        return JSON.stringify(this.state.domain);
+    }
+    // Close dropdowns when clicking outside
+    onClickOutside(ev) {
+        const stateDropdown = this.dropdownStateRef.el;
+        const categoryDropdown = this.dropdownCategoryRef.el;
+
+        if (stateDropdown && !stateDropdown.contains(ev.target)) {
+            this.state.stateDropdownOpen = false;
+        }
+
+        if (categoryDropdown && !categoryDropdown.contains(ev.target)) {
+            this.state.categoryDropdownOpen = false;
+        }
+    }
     // A getter that always computes the filtered list from the full nodes array:
     get filteredNodes() {
         const search = this.state.searchValue.toUpperCase();
@@ -207,63 +388,28 @@ export class GraphModuleComponent extends Component {
      */
     buildGraphOptions() {
         const options = {};
-        const stopDomains = [];
         const excludeDomains = [];
-        
+
         // Set max depth if specified
         if (this.state.maxDepth > 0) {
             options.max_depth = this.state.maxDepth;
         }
-        
-        // Add state-based stop conditions
-        if (this.state.stopOnInstalled) {
-            stopDomains.push([['state', '=', 'installed']]);
-        }
-        
-        if (this.state.stopOnUninstallable) {
-            stopDomains.push([['state', '=', 'uninstallable']]);
-        }
-        
-        // Add category-based stop conditions
-        if (this.state.stopCategory) {
-            // Could be either a category ID or name
-            if (typeof this.state.stopCategory === 'number') {
-                stopDomains.push([['category_id', '=', this.state.stopCategory]]);
-            } else {
-                stopDomains.push([['category_id.name', '=', this.state.stopCategory]]);
-            }
-        }
-        
-        // Add custom domain filters if provided
-        if (this.state.customDomain && this.state.customDomain.length) {
-            stopDomains.push(this.state.customDomain);
-        }
-        
-        // Set exclude domains
-        if (this.state.excludeNonCustom) {
-            excludeDomains.push([['is_custom', '=', false]]);
-        }
-        
-        if (this.state.excludeCategory) {
-            // Could be either a category ID or name
-            if (typeof this.state.excludeCategory === 'number') {
-                excludeDomains.push([['category_id', '=', this.state.excludeCategory]]);
-            } else {
-                excludeDomains.push([['category_id.name', '=', this.state.excludeCategory]]);
-            }
-        }
-        
+
+
         // Add the domains to options if we have any
-            options.stop_domains =  [[["application","=",false]]];
-        
+        if (this.state.domain.length > 0) {
+            options.stop_domains = [this.state.domain];
+        }
         if (excludeDomains.length > 0) {
             options.exclude_domains = excludeDomains;
         }
-        
+
+        console.log({ options })
+
         // Configure dependency/exclusion inclusion
         options.include_dependencies = this.state.includeDependencies !== false;
         options.include_exclusions = this.state.includeExclusions !== false;
-        
+
         return options;
     }
     /**
@@ -381,6 +527,10 @@ export class GraphModuleComponent extends Component {
         this.state.stopOnCategory = null;
         this.state.stopOnNonCustom = false;
         this.state.customFilter = null;
+        this.clearSelections('state');
+        this.clearSelections('category');
+        this.state.applicationFilter = null;
+        this.state.domain = [];
     }
 
     /**

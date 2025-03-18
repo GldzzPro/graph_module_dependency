@@ -64,7 +64,7 @@
                             <div class="col-12">
                                 <h5>Stop Conditions</h5>
                             </div>
-                            <div class="col-md-4">
+                            <div class="col-md-1">
                                 <div class="form-group">
                                     <label for="maxDepth">Maximum Depth</label>
                                     <input type="number" class="form-control" id="maxDepth" t-att-value="state.maxDepth"
@@ -72,31 +72,260 @@
                                     <small class="text-muted">0 means no limit</small>
                                 </div>
                             </div>
+                            <div class="col-md-7">
+                                <div class="module-filters" t-on-click-outside="onClickOutside">
+                                    <div class="d-flex mb-3">
+                                        <!-- State Dropdown -->
+                                        <div class="dropdown me-2" t-ref="dropdownState">
+                                            <button class="btn btn-outline-secondary dropdown-toggle"
+                                                t-on-click="() => this.toggleDropdown('state')">
+                                                <span>States</span>
+                                                <t t-if="state.selectedStates.length > 0">
+                                                    <span class="badge bg-primary ms-2">
+                                                        <t t-esc="state.selectedStates.length" />
+                                                    </span>
+                                                </t>
+                                            </button>
 
-                            <div class="col-md-4">
-                                <div class="form-check mt-4">
-                                    <input class="form-check-input" type="checkbox" id="stopOnInstalled"
-                                        t-att-checked="state.stopOnInstalled" t-on-change="toggleStopOnInstalled" />
-                                    <label class="form-check-label" for="stopOnInstalled">
-                                        Stop on installed modules
-                                    </label>
+                                            <div t-if="state.stateDropdownOpen" class="dropdown-menu show p-2"
+                                                style="min-width: 250px;">
+                                                <div
+                                                    class="dropdown-header d-flex justify-content-between align-items-center">
+                                                    <span>Filter by States</span>
+                                                    <button t-if="state.selectedStates.length > 0"
+                                                        class="btn btn-sm btn-link text-danger"
+                                                        t-on-click="() => this.clearSelections('state')">
+                                                        <i class="fa fa-times" /> Clear
+                                                    </button>
+                                                </div>
+
+                                                <!-- Filter Mode Toggle -->
+                                                <div class="mb-2 d-flex justify-content-center">
+                                                    <div class="btn-group btn-group-sm">
+                                                        <button
+                                                            t-att-class="'btn ' + (state.stateFilterMode ? 'btn-primary' : 'btn-outline-primary')"
+                                                            t-on-click="() => { state.stateFilterMode = true; this.updateDomain(); }">
+                                                            is one of
+                                                        </button>
+                                                        <button
+                                                            t-att-class="'btn ' + (!state.stateFilterMode ? 'btn-primary' : 'btn-outline-primary')"
+                                                            t-on-click="() => { state.stateFilterMode = false; this.updateDomain(); }">
+                                                            is not one of
+                                                        </button>
+                                                    </div>
+                                                </div>
+
+                                                <div class="dropdown-divider"></div>
+                                                <div class="filter-options">
+                                                    <t t-foreach="Array.from(state.availableStates.entries())"
+                                                        t-as="stateEntry" t-key="stateEntry[0]">
+                                                        <div
+                                                            class="form-check d-flex justify-content-between align-items-center">
+                                                            <div>
+                                                                <input type="checkbox" class="form-check-input"
+                                                                    t-att-id="'state-' + stateEntry[0]"
+                                                                    t-att-checked="state.selectedStates.includes(stateEntry[0])"
+                                                                    t-on-change="() => this.toggleSelection('state', stateEntry[0])" />
+                                                                <label class="form-check-label"
+                                                                    t-att-for="'state-' + stateEntry[0]">
+                                                                    <t t-esc="stateEntry[0]" />
+                                                                </label>
+                                                            </div>
+                                                            <span class="badge bg-secondary">
+                                                                <t t-esc="stateEntry[1]" />
+                                                            </span>
+                                                        </div>
+                                                    </t>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <!-- Category Dropdown -->
+                                        <div class="dropdown" t-ref="dropdownCategory">
+                                            <button class="btn btn-outline-secondary dropdown-toggle"
+                                                t-on-click="() => this.toggleDropdown('category')">
+                                                <span>Categories</span>
+                                                <t t-if="state.selectedCategories.length > 0">
+                                                    <span class="badge bg-primary ms-2">
+                                                        <t t-esc="state.selectedCategories.length" />
+                                                    </span>
+                                                </t>
+                                            </button>
+
+                                            <div t-if="state.categoryDropdownOpen" class="dropdown-menu show p-2"
+                                                style="min-width: 250px;">
+                                                <div
+                                                    class="dropdown-header d-flex justify-content-between align-items-center">
+                                                    <span>Filter by Categories</span>
+                                                    <button t-if="state.selectedCategories.length > 0"
+                                                        class="btn btn-sm btn-link text-danger"
+                                                        t-on-click="() => this.clearSelections('category')">
+                                                        <i class="fa fa-times" /> Clear
+                                                    </button>
+                                                </div>
+
+                                                <!-- Filter Mode Toggle -->
+                                                <div class="mb-2 d-flex justify-content-center">
+                                                    <div class="btn-group btn-group-sm">
+                                                        <button
+                                                            t-att-class="'btn ' + (state.categoryFilterMode ? 'btn-primary' : 'btn-outline-primary')"
+                                                            t-on-click="() => { state.categoryFilterMode = true; this.updateDomain(); }">
+                                                            is one of
+                                                        </button>
+                                                        <button
+                                                            t-att-class="'btn ' + (!state.categoryFilterMode ? 'btn-primary' : 'btn-outline-primary')"
+                                                            t-on-click="() => { state.categoryFilterMode = false; this.updateDomain(); }">
+                                                            is not one of
+                                                        </button>
+                                                    </div>
+                                                </div>
+
+                                                <div class="dropdown-divider"></div>
+                                                <div class="filter-options"
+                                                    style="max-height: 300px; overflow-y: auto;">
+                                                    <t t-foreach="Array.from(state.availableCategories.entries())"
+                                                        t-as="categoryEntry" t-key="categoryEntry[0]">
+                                                        <div
+                                                            class="form-check d-flex justify-content-between align-items-center">
+                                                            <div>
+                                                                <input type="checkbox" class="form-check-input"
+                                                                    t-att-id="'category-' + categoryEntry[0]"
+                                                                    t-att-checked="state.selectedCategories.includes(categoryEntry[0])"
+                                                                    t-on-change="() => this.toggleSelection('category', categoryEntry[0])" />
+                                                                <label class="form-check-label"
+                                                                    t-att-for="'category-' + categoryEntry[0]">
+                                                                    <t t-esc="categoryEntry[1].name" />
+                                                                </label>
+                                                            </div>
+                                                            <span class="badge bg-secondary">
+                                                                <t t-esc="categoryEntry[1].count" />
+                                                            </span>
+                                                        </div>
+                                                    </t>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Application Filter Chips -->
+                                    <div class="application-filter mb-3">
+                                        <div class="d-flex gap-2">
+                                            <button
+                                                t-att-class="'btn btn-sm ' + (state.applicationFilter === null ? 'btn-primary' : 'btn-outline-primary')"
+                                                t-on-click="() => this.setApplicationFilter(null)">
+                                                All
+                                                <span class="badge bg-white text-primary ms-1">
+                                                    <t t-esc="state.nodes.length" />
+                                                </span>
+                                            </button>
+
+                                            <button
+                                                t-att-class="'btn btn-sm ' + (state.applicationFilter === true ? 'btn-success' : 'btn-outline-success')"
+                                                t-on-click="() => this.setApplicationFilter(true)">
+                                                Applications
+                                                <span class="badge bg-white text-success ms-1">
+                                                    <t t-esc="this.getApplicationFilterCount(true)" />
+                                                </span>
+                                            </button>
+
+                                            <button
+                                                t-att-class="'btn btn-sm ' + (state.applicationFilter === false ? 'btn-info' : 'btn-outline-info')"
+                                                t-on-click="() => this.setApplicationFilter(false)">
+                                                Modules
+                                                <span class="badge bg-white text-info ms-1">
+                                                    <t t-esc="this.getApplicationFilterCount(false)" />
+                                                </span>
+                                            </button>
+                                            <button
+                                                t-att-class="'btn btn-sm ' + (state.moduleTypeFilter === null ? 'btn-primary' : 'btn-outline-primary')"
+                                                t-on-click="() => this.setModuleTypeFilter(null)">
+                                                All
+                                                <span class="badge bg-white text-primary ms-1">
+                                                    <t t-esc="state.nodes.length" />
+                                                </span>
+                                            </button>
+
+                                            <button
+                                                t-att-class="'btn btn-sm ' + (state.applicationFilter === 'official' ? 'btn-success' : 'btn-outline-success')"
+                                                t-on-click="() => this.setModuleTypeFilter('official')">
+                                                Official Apps
+                                                <span class="badge bg-white text-success ms-1">
+                                                    <t t-esc="this.getModuleTypeFilterCount('official')" />
+                                                </span>
+                                            </button>
+
+                                            <button
+                                                t-att-class="'btn btn-sm ' + (state.applicationFilter === 'industries' ? 'btn-info' : 'btn-outline-info')"
+                                                t-on-click="() => this.setModuleTypeFilter('industries')">
+                                                industries
+                                                <span class="badge bg-white text-info ms-1">
+                                                    <t t-esc="this.getApplicationFilterCount('industries')" />
+                                                </span>
+                                            </button>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
 
                             <div class="col-md-4">
-                                <div class="form-check mt-4">
-                                    <input class="form-check-input" type="checkbox" id="stopOnNonCustom"
-                                        t-att-checked="state.stopOnNonCustom"
-                                        t-on-change="() => this.state.stopOnNonCustom = !this.state.stopOnNonCustom" />
-                                    <label class="form-check-label" for="stopOnNonCustom">
-                                        Stop on non-custom modules
-                                    </label>
+                                <!-- Active Filters Display -->
+                                <div t-if="state.selectedStates.length > 0 || state.selectedCategories.length > 0 || state.applicationFilter !== null"
+                                    class="active-filters mb-3">
+                                    <span class="text-muted me-2">Active filters:</span>
+
+                                    <!-- State filters -->
+                                    <t t-if="state.selectedStates.length > 0">
+                                        <span class="badge bg-light text-dark me-2">
+                                            State
+                                            <t t-esc="state.stateFilterMode ? 'is one of' : 'is not one of'" />:
+                                        </span>
+                                        <t t-foreach="state.selectedStates" t-as="stateName" t-key="stateName">
+                                            <span class="badge bg-primary me-1">
+                                                <t t-esc="stateName" />
+                                                <i class="fa fa-times ms-1"
+                                                    t-on-click="() => this.toggleSelection('state', stateName)" />
+                                            </span>
+                                        </t>
+                                    </t>
+
+                                    <!-- Category filters -->
+                                    <t t-if="state.selectedCategories.length > 0">
+                                        <span class="badge bg-light text-dark me-2">
+                                            Category
+                                            <t t-esc="state.categoryFilterMode ? 'is one of' : 'is not one of'" />:
+                                        </span>
+                                        <t t-foreach="state.selectedCategories" t-as="categoryId" t-key="categoryId">
+                                            <span class="badge bg-info text-dark me-1">
+                                                <t t-esc="state.availableCategories.get(categoryId).name" />
+                                                <i class="fa fa-times ms-1"
+                                                    t-on-click="() => this.toggleSelection('category', categoryId)" />
+                                            </span>
+                                        </t>
+                                    </t>
+
+                                    <!-- Application filter -->
+                                    <t t-if="state.applicationFilter !== null">
+                                        <span class="badge bg-light text-dark me-2">
+                                            Type:
+                                        </span>
+                                        <span
+                                            t-att-class="'badge me-1 ' + (state.applicationFilter ? 'bg-success' : 'bg-info')">
+                                            <t t-esc="state.applicationFilter ? 'Applications' : 'Modules'" />
+                                            <i class="fa fa-times ms-1"
+                                                t-on-click="() => this.setApplicationFilter(null)" />
+                                        </span>
+                                    </t>
                                 </div>
                             </div>
                         </div>
 
                         <div class="row mt-3">
                             <div class="col-md-12">
+                                <!-- Domain Display (for debugging) -->
+                                <div style="width: 100%;" class="mb-3 text-muted small" t-if="state.domain.length > 0">
+                                    <strong>Stop Condition Domain:</strong>
+                                    <t t-esc="this.stringifyDomain()" />
+                                </div>
                                 <button class="btn btn-danger" t-on-click="onClearGraph">clear graph</button>
                                 <button class="btn btn-secondary ml-2" t-on-click="clearStopConditions">
                                     Clear Stop Conditions
