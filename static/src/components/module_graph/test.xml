@@ -202,7 +202,7 @@
                 </t>
             </div>
             <!-- Domain Display (for debugging) -->
-            <div class="mb-3 text-muted small" t-if="state.domain.length > 0">
+            <div style="width: 100%;" class="mb-3 text-muted small" t-if="state.domain.length > 0">
                 <strong>Domain:</strong> <t t-esc="this.stringifyDomain()"/>
             </div>
             <!-- Filtered Modules List -->
