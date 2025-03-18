@@ -62,7 +62,7 @@ export class GraphModuleComponent extends Component {
             categoryFilterMode: true,  // Default is "is one of" (include)
             // Application filter: null = all, true = only apps, false = non-apps
             applicationFilter: null,
-            moduleTypeFilter : null , 
+            moduleTypeFilter: null,
             // Combined domain for filtering
             domain: [],
             // UI states for dropdowns
@@ -89,7 +89,7 @@ export class GraphModuleComponent extends Component {
                 'search_read',
                 [],
                 {
-                    fields: ['id', 'name', 'shortdesc', 'state', 'icon', 'category_id', 'application' , 'module_type'],
+                    fields: ['id', 'name', 'shortdesc', 'state', 'icon', 'category_id', 'application', 'module_type'],
                     order: 'shortdesc',
                 }
             );
@@ -199,7 +199,7 @@ export class GraphModuleComponent extends Component {
         return {
             id: node.id,
             label: node.label,
-            color: DEFAULT_STATE_COLOR[node.state],
+            color: node.color || DEFAULT_STATE_COLOR[node.state],
             state: node.state,
             image: iconPath,
             shapeProperties: {
@@ -482,8 +482,35 @@ export class GraphModuleComponent extends Component {
             //         edges.push(newEdge);
             //     }
             // });
-            this.graphEdges.clear()
-            this.graphEdges.update(data.edges);
+            // Process and add edges to the graph
+            const edges = [];
+            const graphEdges = Object.values(this.graphEdges._data) 
+            console.log({ graphEdges })
+            data.edges.forEach(edge => {
+                const existingEdge = graphEdges.find(e =>
+                    e.from == edge.from && e.to == edge.to
+                );
+
+                if (!existingEdge) {
+                    const newEdge = {
+                        from: edge.from,
+                        to: edge.to
+                    };
+
+                    if (edge.type === 'exclusion') {
+                        newEdge.color = {
+                            color: 'red',
+                            highlight: 'red'
+                        };
+                    }
+
+                    this.state.edges.push(newEdge);
+                    edges.push(newEdge);
+                }else {
+                    console.log({existingEdge})
+                }
+            });
+            this.graphEdges.update(edges);
             this.state.selectedModules.add(moduleId);
             console.log({ selected: this.state.selectedModules, stateEdges: this.graphEdges, dataEdges: data.edges, })
         } catch (error) {
