@@ -45,7 +45,7 @@
                                         <t t-esc="node.label" />)
                                     </label>
                                     <!-- Only display the color input when node.color exists -->
-                                    <t t-if="isModuleSelected(node.id)">
+                                    <t t-if="isModuleInGraph(node.id)">
                                         <input type="color" class="form-control form-control-sm"
                                             t-att-value="node.color" t-att-data-id="node.id"
                                             t-on-change="onChangeColor" />

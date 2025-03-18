@@ -140,7 +140,11 @@ export class GraphModuleComponent extends Component {
        * @param {Object} node - The node data
        * @returns {Object} - Formatted node object for vis.js
        */
-    createNodeObject(node) {
+    createNodeObject(dataNode) {
+        const node = this.state.nodes.find(node => node.id === dataNode.id);
+        if (!node) {
+            return;
+        }
         const iconPath = node.icon || DEFAULT_MODULE_ICON;
         return {
             id: node.id,
@@ -197,6 +201,73 @@ export class GraphModuleComponent extends Component {
         });
         return filteredNodes;
     }
+
+    /**
+     * Build graph options object with dynamic domains
+     */
+    buildGraphOptions() {
+        const options = {};
+        const stopDomains = [];
+        const excludeDomains = [];
+        
+        // Set max depth if specified
+        if (this.state.maxDepth > 0) {
+            options.max_depth = this.state.maxDepth;
+        }
+        
+        // Add state-based stop conditions
+        if (this.state.stopOnInstalled) {
+            stopDomains.push([['state', '=', 'installed']]);
+        }
+        
+        if (this.state.stopOnUninstallable) {
+            stopDomains.push([['state', '=', 'uninstallable']]);
+        }
+        
+        // Add category-based stop conditions
+        if (this.state.stopCategory) {
+            // Could be either a category ID or name
+            if (typeof this.state.stopCategory === 'number') {
+                stopDomains.push([['category_id', '=', this.state.stopCategory]]);
+            } else {
+                stopDomains.push([['category_id.name', '=', this.state.stopCategory]]);
+            }
+        }
+        
+        // Add custom domain filters if provided
+        if (this.state.customDomain && this.state.customDomain.length) {
+            stopDomains.push(this.state.customDomain);
+        }
+        
+        // Set exclude domains
+        if (this.state.excludeNonCustom) {
+            excludeDomains.push([['is_custom', '=', false]]);
+        }
+        
+        if (this.state.excludeCategory) {
+            // Could be either a category ID or name
+            if (typeof this.state.excludeCategory === 'number') {
+                excludeDomains.push([['category_id', '=', this.state.excludeCategory]]);
+            } else {
+                excludeDomains.push([['category_id.name', '=', this.state.excludeCategory]]);
+            }
+        }
+        
+        // Add the domains to options if we have any
+        if (stopDomains.length > 0) {
+            options.stop_domains = stopDomains;
+        }
+        
+        if (excludeDomains.length > 0) {
+            options.exclude_domains = excludeDomains;
+        }
+        
+        // Configure dependency/exclusion inclusion
+        options.include_dependencies = this.state.includeDependencies !== false;
+        options.include_exclusions = this.state.includeExclusions !== false;
+        
+        return options;
+    }
     /**
      * Handle clicking on a module in the navigation list
      * @param {Event} event - Click event
@@ -211,86 +282,66 @@ export class GraphModuleComponent extends Component {
 
         // Update the graph with the selected module
         this.graphNodes.update([this.createNodeObject(moduleNode)]);
-        this.state.selectedModules.add(moduleId);
+
         this.state.loading = true;
 
         // Fetch module dependencies
         try {
             // Build options object with stop conditions
-            const options = {};
+            const options = this.buildGraphOptions();
 
-            if (this.state.maxDepth > 0) {
-                options.max_depth = this.state.maxDepth;
-            }
-
-            if (this.state.stopOnInstalled) {
-                options.stop_on_installed = true;
-            }
-
-            if (this.state.stopOnCategory) {
-                options.stop_on_category = this.state.stopOnCategory;
-            }
-
-            if (this.state.stopOnNonCustom) {
-                options.stop_on_non_custom = true;
-            }
-
-            if (this.state.customFilter) {
-                options.custom_filter = this.state.customFilter;
-            }
+            const moduleIds = [...Array.from(this.state.selectedModules), moduleId];
 
             // Call the server method with the options
             const data = await this.orm.call(
                 'ir.module.module',
                 'get_module_graph',
-                [moduleId],
+                [moduleIds],
                 { options }
             );
 
             console.log({ data })
+            // // Process and add nodes to the graph
 
-            // Process and add nodes to the graph
-            const nodes = [];
-            data.nodes.forEach(node => {
-                if (node.id) {
-                    // Find the original node with all information
-                    const originalNode = this.state.nodes.find(n => n.id === node.id);
-                    if (originalNode) {
-                        nodes.push(this.createNodeObject(originalNode));
-                        this.state.selectedModules.add(node.id);
-                    }
-                }
-            });
-            this.graphNodes.update(nodes);
-
+            // const nodes = [];
+            // data.nodes.forEach(node => {
+            //     if (node.id) {
+            //         // Find the original node with all information
+            //         const originalNode = this.state.nodes.find(n => n.id === node.id);
+            //         if (originalNode) {
+            //             nodes.push(this.createNodeObject(originalNode));
+            //         }
+            //     }
+            // });
+            this.graphNodes.update(data.nodes.map(node => this.createNodeObject(node)));
             // Process and add edges to the graph
-            const edges = [];
-            data.edges.forEach(edge => {
-                const existingEdge = this.state.edges.find(e =>
-                    e.from === edge.from && e.to === edge.to
-                );
-                console.log({ edge, existingEdge })
-                if (!existingEdge) {
-                    const newEdge = {
-                        from: edge.from,
-                        to: edge.to
-                    };
+            // const edges = [];
+            // data.edges.forEach(edge => {
+            //     const existingEdge = this.state.edges.find(e =>
+            //         e.from === edge.from && e.to === edge.to
+            //     );
+            //     console.log({ edge, existingEdge })
+            //     if (!existingEdge) {
+            //         const newEdge = {
+            //             from: edge.from,
+            //             to: edge.to
+            //         };
 
-                    if (edge.type === 'exclusion') {
-                        newEdge.color = {
-                            color: 'red',
-                            highlight: 'red'
-                        };
-                    }
+            //         if (edge.type === 'exclusion') {
+            //             newEdge.color = {
+            //                 color: 'red',
+            //                 highlight: 'red'
+            //             };
+            //         }
 
-                    this.state.edges.push(newEdge);
-                    edges.push(newEdge);
-                }
-            });
-
-            this.graphEdges.update(edges);
-
-            console.log({ stateEdges: this.graphEdges, dataEdges: data.edges, edges })
+            //         this.state.edges.push(newEdge);
+            //         edges.push(newEdge);
+            //     }
+            // });
+            this.graphEdges.clear()
+            this.graphEdges.update(data.edges);
+            this.state.selectedModules.add(moduleId);
+            console.log({ selected: this.state.selectedModules, stateEdges: this.graphEdges, dataEdges: data.edges, })
         } catch (error) {
             console.error("Error fetching module graph data:", error);
         } finally {
@@ -350,6 +401,15 @@ export class GraphModuleComponent extends Component {
     isModuleSelected(moduleId) {
         return this.state.selectedModules.has(moduleId);
     }
+
+    /**
+     * Checks if a module is in the graph
+     * @param {number} moduleId - Module ID to check
+     * @returns {boolean} - True if the module is in the graph
+     */
+    isModuleInGraph(moduleId) {
+        return this.graphNodes?._data ? Object.keys(this.graphNodes._data).some(nodeId => nodeId == moduleId) : false;
+    }
     /**
      * Handle color change for a module
      * @param {Event} event - Change event from the color input
@@ -375,3 +435,4 @@ export class GraphModuleComponent extends Component {
 registry.category("actions").add("module_graph", GraphModuleComponent);
 
 export default GraphModuleComponent;
+
