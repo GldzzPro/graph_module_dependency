@@ -14,12 +14,6 @@
             <field name="tag">model_graph</field>
             <field name="target">main</field>
         </record>
-        <!-- Client action for model graph -->
-        <record id="module_test_action" model="ir.actions.client">
-            <field name="name">Module Test</field>
-            <field name="tag">module_test</field>
-            <field name="target">main</field>
-        </record>
 
         <!-- Main menu for all dependency graphs -->
         <menuitem id="menu_dependency_graphs"
@@ -40,11 +34,5 @@
             parent="menu_dependency_graphs"
             sequence="20"
             action="model_graph_action" />
-        <!-- Model graph menu under the main dependency graphs menu -->
-        <menuitem id="menu_test"
-            name="Module Test"
-            parent="menu_dependency_graphs"
-            sequence="30"
-            action="module_test_action" />
     </data>
 </odoo>
