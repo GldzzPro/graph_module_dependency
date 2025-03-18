@@ -1,5 +1,7 @@
-from odoo import models, api
+from odoo import models, fields, api
+import logging
 
+_logger = logging.getLogger(__name__)
 
 class Module(models.Model):
     _inherit = "ir.module.module"
@@ -7,7 +9,7 @@ class Module(models.Model):
     @api.model
     def get_module_graph(self, module_ids, options=None):
         """
-        Build a dependency graph for the given module IDs.
+        Build a dependency graph for the given module IDs with cycle detection.
         
         Args:
             module_ids: A list of module IDs or a single module ID
@@ -22,7 +24,6 @@ class Module(models.Model):
         Returns:
             Dictionary with 'nodes' and 'edges' representing the module graph
         """
-        print("self",self,"module_ids",module_ids,"options",options)
         # Always initialize options as a dict if None
         if options is None:
             options = {}
@@ -33,6 +34,13 @@ class Module(models.Model):
         # Initialize depth if not present
         if "current_depth" not in options:
             options["current_depth"] = 0
+            
+        # Initialize cycle tracking data structures if this is the root call
+        if "cycle_counter" not in options:
+            options["cycle_counter"] = 0  # For generating unique cycle IDs
+            options["all_visited"] = set()  # Track all visited nodes across the entire traversal
+            options["current_path"] = []  # Track current DFS path for cycle detection
+            options["cycles"] = {}  # Map of cycle_id -> set of node IDs in cycle
 
         # Ensure module_ids is always a list
         if not isinstance(module_ids, list):
@@ -57,6 +65,29 @@ class Module(models.Model):
 
         # Process each module
         for module in modules:
+            # Skip if we've already processed this module in the current path (cycle detected)
+            if module.id in options["current_path"]:
+                # Detect and process cycle
+                cycle_start_index = options["current_path"].index(module.id)
+                cycle_path = options["current_path"][cycle_start_index:]
+                
+                # Generate a new unique cycle ID
+                options["cycle_counter"] += 1
+                cycle_id = options["cycle_counter"]
+                
+                # Store the cycle nodes
+                options["cycles"][cycle_id] = set(cycle_path + [module.id])
+                
+                # We'll skip further processing of this module to break the recursion,
+                # but we've identified and stored the cycle information
+                continue
+                
+            # Add module to the current path
+            options["current_path"].append(module.id)
+            
+            # Add to all visited
+            options["all_visited"].add(module.id)
+            
             # Add the current module to nodes
             module_data = {
                 "id": module.id,
@@ -79,6 +110,8 @@ class Module(models.Model):
             # Check if we should stop recursion for this module
             should_stop = self._should_stop_graph_traversal(module, options)
             if should_stop:
+                # Remove from current path before continuing
+                options["current_path"].pop()
                 continue
 
             # Process dependencies with incremented depth
@@ -96,9 +129,15 @@ class Module(models.Model):
                         continue
                         
                     dependency_modules.append(depended_module.id)
-                    edges.append(
-                        {"from": module.id, "to": depended_module.id, "type": "dependency"}
-                    )
+                    
+                    # Create edge data
+                    edge_data = {
+                        "from": module.id, 
+                        "to": depended_module.id, 
+                        "type": "dependency"
+                    }
+                    
+                    edges.append(edge_data)
 
                 if dependency_modules:
                     res = self.get_module_graph(dependency_modules, dependency_options)
@@ -116,14 +155,27 @@ class Module(models.Model):
                         continue
                         
                     exclusion_modules.append(excluded_module.id)
-                    edges.append(
-                        {"from": module.id, "to": excluded_module.id, "type": "exclusion"}
-                    )
+                    
+                    # Create edge data
+                    edge_data = {
+                        "from": module.id, 
+                        "to": excluded_module.id, 
+                        "type": "exclusion"
+                    }
+                    
+                    edges.append(edge_data)
 
                 if exclusion_modules:
                     res = self.get_module_graph(exclusion_modules, dependency_options)
                     nodes.extend(res["nodes"])
                     edges.extend(res["edges"])
+            
+            # Remove the current module from the path when we're done with it
+            options["current_path"].pop()
+
+        # After all nodes are processed, mark cycle nodes and edges if we're at the root level
+        if options.get("current_depth", 0) == 0 and options.get("cycles"):
+            nodes, edges = self._mark_cycles_in_graph(nodes, edges, options.get("cycles", {}))
 
         # De-duplicate nodes and edges
         unique_nodes = list({node["id"]: node for node in nodes}.values())
@@ -132,6 +184,39 @@ class Module(models.Model):
         )
 
         return {"nodes": unique_nodes, "edges": unique_edges}
+    
+    def _mark_cycles_in_graph(self, nodes, edges, cycles):
+        """
+        Mark all nodes and edges that are part of cycles.
+        
+        Args:
+            nodes: List of node dictionaries
+            edges: List of edge dictionaries
+            cycles: Dictionary mapping cycle_id to set of node IDs in that cycle
+            
+        Returns:
+            Tuple (nodes, edges) with cycle information added
+        """
+        # Process nodes
+        for node in nodes:
+            for cycle_id, cycle_nodes in cycles.items():
+                if node["id"] in cycle_nodes:
+                    node["in_cycle"] = True
+                    node["cycle_id"] = cycle_id
+                    node["type"] = "cycleNode"
+        
+        # Process edges
+        for edge in edges:
+            for cycle_id, cycle_nodes in cycles.items():
+                # Check if both ends of the edge are in the same cycle
+                if edge["from"] in cycle_nodes and edge["to"] in cycle_nodes:
+                    # Check if they're adjacent in the cycle path
+                    # (This requires more complex logic to determine edge direction in cycle)
+                    edge["in_cycle"] = True
+                    edge["cycle_id"] = cycle_id
+                    edge["type"] = "cycleDirection"
+        
+        return nodes, edges
     
     def _should_stop_graph_traversal(self, module, options):
         """
@@ -150,15 +235,23 @@ class Module(models.Model):
             
         # Check each domain in stop_domains
         for domain in options.get("stop_domains", []):
-            # Create a domain with the current module ID
-            full_domain = [("id", "=", module.id)] + domain
-            
-            # Search for modules matching the domain
-            matching_modules = self.search(full_domain)
-            
-            # If we find a match, stop traversal
-            if matching_modules:
-                return True
+            # Ensure domain is a list
+            if not isinstance(domain, list):
+                continue
+                
+            try:
+                # Create a domain with the current module ID
+                full_domain = [("id", "=", module.id)] + domain
+                
+                # Search for modules matching the domain
+                matching_modules = self.search(full_domain)
+                
+                # If we find a match, stop traversal
+                if matching_modules:
+                    return True
+                    
+            except Exception as e:
+                _logger.error(f"Error processing domain {domain}: {e}")
                 
         return False
     
@@ -179,14 +272,22 @@ class Module(models.Model):
             
         # Check each domain in exclude_domains
         for domain in options.get("exclude_domains", []):
-            # Create a domain with the current module ID
-            full_domain = [("id", "=", module.id)] + domain
-            
-            # Search for modules matching the domain
-            matching_modules = self.search(full_domain)
-            
-            # If we find a match, exclude the module
-            if matching_modules:
-                return True
+            # Ensure domain is a list
+            if not isinstance(domain, list):
+                continue
+                
+            try:
+                # Create a domain with the current module ID
+                full_domain = [("id", "=", module.id)] + domain
+                
+                # Search for modules matching the domain
+                matching_modules = self.search(full_domain)
+                
+                # If we find a match, exclude the module
+                if matching_modules:
+                    return True
+                    
+            except Exception as e:
+                _logger.error(f"Error processing domain {domain}: {e}")
                 
         return False

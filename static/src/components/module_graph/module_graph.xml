@@ -236,7 +236,7 @@
                                                     <t t-esc="this.getApplicationFilterCount(false)" />
                                                 </span>
                                             </button>
-                                            <button
+                                            <!-- <button
                                                 t-att-class="'btn btn-sm ' + (state.moduleTypeFilter === null ? 'btn-primary' : 'btn-outline-primary')"
                                                 t-on-click="() => this.setModuleTypeFilter(null)">
                                                 All
@@ -261,7 +261,7 @@
                                                 <span class="badge bg-white text-info ms-1">
                                                     <t t-esc="this.getApplicationFilterCount('industries')" />
                                                 </span>
-                                            </button>
+                                            </button> -->
                                         </div>
                                     </div>
                                 </div>

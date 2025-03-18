@@ -199,7 +199,7 @@ export class GraphModuleComponent extends Component {
         return {
             id: node.id,
             label: node.label,
-            color: node.color || DEFAULT_STATE_COLOR[node.state],
+            color: dataNode.in_cycle ? 'red' : node.color || DEFAULT_STATE_COLOR[node.state],
             state: node.state,
             image: iconPath,
             shapeProperties: {
@@ -458,31 +458,7 @@ export class GraphModuleComponent extends Component {
             //     }
             // });
             this.graphNodes.update(data.nodes.map(node => this.createNodeObject(node)));
-            // Process and add edges to the graph
-            // const edges = [];
-            // data.edges.forEach(edge => {
-            //     const existingEdge = this.state.edges.find(e =>
-            //         e.from === edge.from && e.to === edge.to
-            //     );
-            //     console.log({ edge, existingEdge })
-            //     if (!existingEdge) {
-            //         const newEdge = {
-            //             from: edge.from,
-            //             to: edge.to
-            //         };
 
-            //         if (edge.type === 'exclusion') {
-            //             newEdge.color = {
-            //                 color: 'red',
-            //                 highlight: 'red'
-            //             };
-            //         }
-
-            //         this.state.edges.push(newEdge);
-            //         edges.push(newEdge);
-            //     }
-            // });
-            // Process and add edges to the graph
             const edges = [];
             const graphEdges = Object.values(this.graphEdges._data) 
             console.log({ graphEdges })
@@ -497,12 +473,14 @@ export class GraphModuleComponent extends Component {
                         to: edge.to
                     };
 
-                    if (edge.type === 'exclusion') {
+                    if (edge.type === 'cycleDirection') {
                         newEdge.color = {
                             color: 'red',
                             highlight: 'red'
+                            
                         };
                     }
+
 
                     this.state.edges.push(newEdge);
                     edges.push(newEdge);
