@@ -254,9 +254,7 @@ export class GraphModuleComponent extends Component {
         }
         
         // Add the domains to options if we have any
-        if (stopDomains.length > 0) {
-            options.stop_domains = stopDomains;
-        }
+            options.stop_domains =  [[["application","=",false]]];
         
         if (excludeDomains.length > 0) {
             options.exclude_domains = excludeDomains;

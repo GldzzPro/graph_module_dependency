@@ -1,4 +1,4 @@
-from odoo import models, api, fields
+from odoo import models, api
 
 
 class Module(models.Model):
@@ -22,6 +22,7 @@ class Module(models.Model):
         Returns:
             Dictionary with 'nodes' and 'edges' representing the module graph
         """
+        print("self",self,"module_ids",module_ids,"options",options)
         # Always initialize options as a dict if None
         if options is None:
             options = {}
