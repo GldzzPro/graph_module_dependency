@@ -31,10 +31,83 @@ const DEFAULT_NETWORK_OPTIONS = {
     }
 }
 
+// Child Component 1: Module List Component
+class ModuleListComponent extends Component {
+    static template = "module_list_template";
+
+    static props = {
+        nodes: Array,
+        filteredNodes: Array,
+        stateFilter: Object,
+        isModuleSelected: Function,
+        isModuleInGraph: Function,
+        onClickModule: Function,
+        onToggleState: Function,
+        onInputKeyup: Function,
+        onChangeColor: Function,
+    };
+
+    setup() {
+        // Just pass through the props from parent
+        console.log({ props: this.props })
+
+    }
+}
+
+// Child Component 2: Graph Controls Component
+class GraphControlsComponent extends Component {
+    static template = "graph_controls_template";
+
+    static props = {
+        state: Object,
+        availableStates: Map,
+        availableCategories: Map,
+        selectedStates: Array,
+        selectedCategories: Array,
+        toggleDropdown: Function,
+        onClickOutside: Function,
+        toggleFilterMode: Function,
+        toggleSelection: Function,
+        clearSelections: Function,
+        setApplicationFilter: Function,
+        getApplicationFilterCount: Function,
+        getModuleTypeFilterCount: Function,
+        setModuleTypeFilter: Function,
+        stringifyDomain: Function,
+        onChangeMaxDepth: Function,
+        clearStopConditions: Function,
+        onClearGraph: Function,
+    };
+
+    setup() {
+        this.dropdownStateRef = useRef("dropdownState");
+        this.dropdownCategoryRef = useRef("dropdownCategory");
+    }
+}
+
+// Child Component 3: Graph Canvas Component
+class GraphCanvasComponent extends Component {
+    static template = "graph_canvas_template";
+
+    static props = {
+        setupNetwork: Function,
+        graphRef: Object,
+    };
+
+    setup() {
+        // Just pass the graph reference
+    }
+}
+
+// Main Component with composition
 export class GraphModuleComponent extends Component {
     static template = "module_graphe_template";
-
     static props = {};
+    static components = {
+        ModuleListComponent,
+        GraphControlsComponent,
+        GraphCanvasComponent,
+    };
 
     setup() {
         this.state = useState({
@@ -73,8 +146,6 @@ export class GraphModuleComponent extends Component {
         this.graphEdges = null;
         this.network = null;
         this.containerRef = useRef("graph");
-        this.dropdownStateRef = useRef("dropdownState");
-        this.dropdownCategoryRef = useRef("dropdownCategory");
         this.orm = useService("orm");
         this.action = useService("action");
 
@@ -142,23 +213,27 @@ export class GraphModuleComponent extends Component {
         });
 
         onMounted(() => {
-            if (this.containerRef.el) {
-                // Initialize vis.js dataset objects
-                this.graphNodes = new vis.DataSet([]);
-                this.graphEdges = new vis.DataSet([]);
-                // Initialize the network with custom node rendering
-                this.network = new vis.Network(
-                    this.containerRef.el,
-                    {
-                        nodes: this.graphNodes,
-                        edges: this.graphEdges
-                    },
-                    DEFAULT_NETWORK_OPTIONS
-                );
-                // Set up network event handlers
-                this.setupNetworkEvents();
-            }
+            this.setupNetwork();
         });
+    }
+
+    setupNetwork() {
+        if (this.containerRef.el) {
+            // Initialize vis.js dataset objects
+            this.graphNodes = new vis.DataSet([]);
+            this.graphEdges = new vis.DataSet([]);
+            // Initialize the network with custom node rendering
+            this.network = new vis.Network(
+                this.containerRef.el,
+                {
+                    nodes: this.graphNodes,
+                    edges: this.graphEdges
+                },
+                DEFAULT_NETWORK_OPTIONS
+            );
+            // Set up network event handlers
+            this.setupNetworkEvents();
+        }
     }
 
     /**
@@ -359,8 +434,8 @@ export class GraphModuleComponent extends Component {
     }
     // Close dropdowns when clicking outside
     onClickOutside(ev) {
-        const stateDropdown = this.dropdownStateRef.el;
-        const categoryDropdown = this.dropdownCategoryRef.el;
+        const stateDropdown = document.querySelector('[t-ref="dropdownState"]');
+        const categoryDropdown = document.querySelector('[t-ref="dropdownCategory"]');
 
         if (stateDropdown && !stateDropdown.contains(ev.target)) {
             this.state.stateDropdownOpen = false;
@@ -445,22 +520,11 @@ export class GraphModuleComponent extends Component {
             );
 
             console.log({ data })
-            // // Process and add nodes to the graph
 
-            // const nodes = [];
-            // data.nodes.forEach(node => {
-            //     if (node.id) {
-            //         // Find the original node with all information
-            //         const originalNode = this.state.nodes.find(n => n.id === node.id);
-            //         if (originalNode) {
-            //             nodes.push(this.createNodeObject(originalNode));
-            //         }
-            //     }
-            // });
             this.graphNodes.update(data.nodes.map(node => this.createNodeObject(node)));
 
             const edges = [];
-            const graphEdges = Object.values(this.graphEdges._data) 
+            const graphEdges = Object.values(this.graphEdges._data)
             console.log({ graphEdges })
             data.edges.forEach(edge => {
                 const existingEdge = graphEdges.find(e =>
@@ -477,15 +541,15 @@ export class GraphModuleComponent extends Component {
                         newEdge.color = {
                             color: 'red',
                             highlight: 'red'
-                            
+
                         };
                     }
 
 
                     this.state.edges.push(newEdge);
                     edges.push(newEdge);
-                }else {
-                    console.log({existingEdge})
+                } else {
+                    console.log({ existingEdge })
                 }
             });
             this.graphEdges.update(edges);
@@ -552,7 +616,7 @@ export class GraphModuleComponent extends Component {
      * @returns {boolean} - True if the module is selected
      */
     isModuleSelected(moduleId) {
-        return this.state.selectedModules.has(moduleId);
+        return this.state?.selectedModules?.has(moduleId) ?? false;
     }
 
     /**
@@ -576,16 +640,14 @@ export class GraphModuleComponent extends Component {
     }
 
     onClearGraph() {
-        this.graphEdges.clear()
-        this.graphNodes.clear()
-        this.state.selectedModules = new Set()
-        this.state.edges = []
+        this.graphEdges.clear();
+        this.graphNodes.clear();
+        this.state.selectedModules = new Set();
+        this.state.edges = [];
     }
-
 }
 
 // Register this component as a client action
 registry.category("actions").add("module_graph", GraphModuleComponent);
 
 export default GraphModuleComponent;
-
