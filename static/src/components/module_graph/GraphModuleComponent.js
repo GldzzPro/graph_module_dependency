@@ -439,7 +439,7 @@ export class GraphModuleComponent extends Component {
             // Call the server method with the options
             const data = await this.orm.call(
                 'ir.module.module',
-                'get_module_graph',
+                'get_reverse_dependency_graph',
                 [moduleIds],
                 { options }
             );
