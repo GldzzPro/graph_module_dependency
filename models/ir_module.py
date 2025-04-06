@@ -1,4 +1,4 @@
-from odoo import models, fields, api
+from odoo import models, api
 import logging
 
 _logger = logging.getLogger(__name__)
@@ -11,6 +11,17 @@ class Module(models.Model):
     def get_module_graph(self, module_ids, options=None):
         """Build a dependency graph following module dependencies."""
         options = options or {}
+        if options.get("max_depth", -1) == 0:
+            modules = self.browse(module_ids)
+            nodes = [
+                {
+                    "id": m.id,
+                    "label": m.name,
+                    "state": m.state,
+                }
+                for m in modules
+            ]
+            return {"nodes": nodes, "edges": []}
         return self._build_graph(
             module_ids=module_ids,
             options=options,
@@ -34,6 +45,17 @@ class Module(models.Model):
     def get_reverse_dependency_graph(self, module_ids, options=None):
         """Build a reverse dependency graph showing dependent modules."""
         options = options or {}
+        if options.get("max_depth", -1) == 0:
+            modules = self.browse(module_ids)
+            nodes = [
+                {
+                    "id": m.id,
+                    "label": m.name,
+                    "state": m.state,
+                }
+                for m in modules
+            ]
+            return {"nodes": nodes, "edges": []}
         return self._build_graph(
             module_ids=module_ids,
             options=options,
