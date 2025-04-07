@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+<t t-name="graph_module_dependency.DomainOptionsHeader">
+    <div class="o_module_graph_controls mb-3">
+        <div class="row mt-3">
+            <div class="col-12 mb-2">
+                <label class="mb-1 fw-bold">Dependency Direction: </label>
+                <div class="btn-group" role="group" aria-label="Dependency Direction">
+                    <button t-att-class="'btn ' + (props.direction === 'depends_on' ? 'btn-primary' : 'btn-outline-primary')"
+                            t-on-click="() => onToggleDirection('depends_on')">
+                        Depends On
+                    </button>
+                    <button t-att-class="'btn ' + (props.direction === 'depended_by' ? 'btn-primary' : 'btn-outline-primary')"
+                            t-on-click="() => onToggleDirection('depended_by')">
+                        Depended By
+                    </button>
+                </div>
+            </div>
+            <div class="col-12">
+                <h5>Stop Conditions</h5>
+            </div>
+            <div class="col-md-2">
+                <div class="form-group">
+                    <label class="mb-1">Limit Depth</label>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="limitDepthSwitch"
+                               t-att-checked="props.limitDepthEnabled"
+                               t-on-change="onToggleLimitDepth" />
+                        <label class="form-check-label" for="limitDepthSwitch">
+                            Enable
+                        </label>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-2">
+                <div class="form-group">
+                    <label for="maxDepth">Max Edge Depth</label>
+                    <input type="number" class="form-control" id="maxDepth"
+                           t-att-value="props.maxDepth"
+                           t-on-change="onMaxDepthChange"
+                           min="0"
+                           t-att-disabled="!props.limitDepthEnabled" />
+                    <small class="text-muted">0=root only, 1=1 edge, etc.</small>
+                </div>
+            </div>
+            <div class="col-md-8 d-flex align-items-end gap-2">
+                <button class="btn btn-danger" t-on-click="onClearGraph">Clear Graph</button>
+                <button class="btn btn-secondary" t-on-click="onClearStopConditions">Clear Stop Conditions</button>
+            </div>
+            <div class="col-12 mt-3">
+                <div t-if="props.selectedStates.length > 0 || props.selectedCategories.length > 0 || props.applicationFilter !== null"
+                     class="active-filters mb-3">
+                    <span class="text-muted me-2">Active filters:</span>
+
+                    <!-- State filters -->
+                    <t t-if="props.selectedStates.length > 0">
+                        <span class="badge bg-light text-dark me-2">
+                            State
+                            <t t-esc="props.stateFilterMode ? 'is one of' : 'is not one of'" />:
+                        </span>
+                        <t t-foreach="props.selectedStates" t-as="stateName" t-key="stateName">
+                            <span class="badge bg-primary me-1">
+                                <t t-esc="stateName" />
+                                <i class="fa fa-times ms-1"
+                                   t-on-click="() => props.onRemoveState(stateName)" />
+                            </span>
+                        </t>
+                    </t>
+
+                    <!-- Category filters -->
+                    <t t-if="props.selectedCategories.length > 0">
+                        <span class="badge bg-light text-dark me-2">
+                            Category
+                            <t t-esc="props.categoryFilterMode ? 'is one of' : 'is not one of'" />:
+                        </span>
+                        <t t-foreach="props.selectedCategories" t-as="categoryId" t-key="categoryId">
+                            <span class="badge bg-info text-dark me-1">
+                                <t t-esc="props.availableCategories.get(categoryId).name" />
+                                <i class="fa fa-times ms-1"
+                                   t-on-click="() => props.onRemoveCategory(categoryId)" />
+                            </span>
+                        </t>
+                    </t>
+
+                    <!-- Application filter -->
+                    <t t-if="props.applicationFilter !== null">
+                        <span class="badge bg-light text-dark me-2">
+                            Type:
+                        </span>
+                        <span t-att-class="'badge me-1 ' + (props.applicationFilter ? 'bg-success' : 'bg-info')">
+                            <t t-esc="props.applicationFilter ? 'Applications' : 'Modules'" />
+                            <i class="fa fa-times ms-1"
+                               t-on-click="props.onClearApplicationFilter" />
+                        </span>
+                    </t>
+                </div>
+            </div>
+
+            <div class="col-12">
+                <div style="width: 100%;" class="mb-3 text-muted small" t-if="props.domainString">
+                    <strong>Stop Condition Domain:</strong>
+                    <t t-esc="props.domainString" />
+                </div>
+            </div>
+        </div>
+    </div>
+</t>
+</templates>

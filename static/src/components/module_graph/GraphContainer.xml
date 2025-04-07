@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+<t t-name="graph_module_dependency.GraphContainer">
+    <div class="module_graph_container border" t-ref="graphContainer" style="height: 600px;" />
+</t>
+</templates>

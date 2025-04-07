@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+<t t-name="graph_module_dependency.Sidebar">
+    <div class="module_graph_nav">
+        <div class="input-group mb-3">
+            <input type="text" class="form-control" placeholder="Search modules..."
+                   t-model="localState.searchValue"
+                   t-on-keyup="onSearchInput" />
+            <div class="input-group-append">
+                <span class="input-group-text">
+                    <i class="fa fa-search" />
+                </span>
+            </div>
+        </div>
+        <ul class="list-group module_graph_nav_list">
+            <t t-foreach="filteredModules" t-as="module" t-key="module.id">
+                <li class="list-group-item"
+                    t-on-click="(ev) => onModuleClick(ev, module)">
+                    <img t-att-src="module.icon" class="rounded-circle o_object_fit_cover"
+                         width="24" height="24" />
+                    <label class="list-desc">
+                        <t t-esc="module.shortdesc" /> (<t t-esc="module.name" />)
+                    </label>
+                    <input type="color" class="form-control form-control-sm"
+                           t-att-value="module.color"
+                           t-on-click.stop="() => {}"
+                           t-on-change="(ev) => onColorChange(ev, module)" />
+                </li>
+            </t>
+        </ul>
+    </div>
+</t>
+</templates>

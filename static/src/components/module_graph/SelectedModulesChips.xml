@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+<t t-name="graph_module_dependency.SelectedModulesChips">
+    <div class="selected-modules-chips d-flex flex-row overflow-auto gap-2 p-2 border rounded">
+        <t t-if="props.selectedModules.length === 0">
+            <span class="text-muted">No modules selected</span>
+        </t>
+        <t t-foreach="props.selectedModules" t-as="module" t-key="module.id">
+            <div class="badge d-flex align-items-center p-2"
+                 t-att-style="'background-color: ' + (module.color || '#007bff') + '; color: white;'">
+                <span class="me-2"><t t-esc="module.shortdesc"/> (<t t-esc="module.name"/>)</span>
+                <i class="fa fa-times cursor-pointer" t-on-click="() => onRemove(module.id)"></i>
+            </div>
+        </t>
+    </div>
+</t>
+</templates>

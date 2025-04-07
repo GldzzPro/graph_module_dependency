@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+<t t-name="graph_module_dependency.MainModuleGraph">
+    <div class="row">
+        <div class="col-md-3">
+            <Sidebar modules="state.modules"
+                     onSelectModule.bind="onSelectModule"
+                     onChangeColor.bind="onChangeColor" />
+        </div>
+        <div class="col-md-9">
+            <DomainOptionsHeader
+                direction="state.direction"
+                limitDepthEnabled="state.limitDepthEnabled"
+                maxDepth="state.maxDepth"
+                selectedStates="state.selectedStates || []"
+                selectedCategories="state.selectedCategories || []"
+                availableCategories="state.availableCategories || {}"
+                stateFilterMode="state.stateFilterMode || true"
+                categoryFilterMode="state.categoryFilterMode || true"
+                applicationFilter="state.applicationFilter"
+                domainString="state.domainString || ''"
+                onChangeDirection="onChangeDirection"
+                onToggleLimitDepth="onToggleLimitDepth"
+                onMaxDepthChange="onMaxDepthChange"
+                onClearGraph="onClearGraph"
+                onClearStopConditions="onClearStopConditions"
+                onRemoveState="onRemoveState"
+                onRemoveCategory="onRemoveCategory"
+                onClearApplicationFilter="onClearApplicationFilter" />
+            <SelectedModulesChips
+                selectedModules="state.selectedModules"
+                onRemoveModule.bind="onRemoveModule" />
+            <GraphContainer
+                nodes="state.nodes"
+                edges="state.edges" />
+        </div>
+    </div>
+</t>
+</templates>
