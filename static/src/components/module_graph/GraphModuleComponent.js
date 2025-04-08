@@ -37,38 +37,41 @@ export class GraphModuleComponent extends Component {
     static props = {};
 
     setup() {
-        this.state = useState({
-            nodes: [],
-            edges: [],
-            module_info: {},
-            selectedModules: new Set(),
-            stateFilter: {},
-            searchValue: "",
-            maxDepth: 3,
-            stopOnInstalled: false,
-            stopOnCategory: null,
-            stopOnNonCustom: false,
-            customFilter: null,
-            graph: null,
-            loading: false,
-            // Available states and categories with counts
-            availableStates: new Map(),
-            availableCategories: new Map(),
-            // Selected states and categories
-            selectedStates: [],
-            selectedCategories: [],
-            // Filter modes (include = true, exclude = false)
-            stateFilterMode: true,     // Default is "is one of" (include)
-            categoryFilterMode: true,  // Default is "is one of" (include)
-            // Application filter: null = all, true = only apps, false = non-apps
-            applicationFilter: null,
-            moduleTypeFilter: null,
-            // Combined domain for filtering
-            domain: [],
-            // UI states for dropdowns
-            stateDropdownOpen: false,
-            categoryDropdownOpen: false,
-        });
+this.state = useState({
+    nodes: [],
+    edges: [],
+    module_info: {},
+    selectedModules: new Set(),
+    stateFilter: {},
+    searchValue: "",
+    maxDepth: 0,
+    limitDepthEnabled: false,
+    stopOnInstalled: false,
+    stopOnCategory: null,
+    stopOnNonCustom: false,
+    customFilter: null,
+    graph: null,
+    loading: false,
+    // Available states and categories with counts
+    availableStates: new Map(),
+    availableCategories: new Map(),
+    // Selected states and categories
+    selectedStates: [],
+    selectedCategories: [],
+    // Filter modes (include = true, exclude = false)
+    stateFilterMode: true,     // Default is "is one of" (include)
+    categoryFilterMode: true,  // Default is "is one of" (include)
+    // Application filter: null = all, true = only apps, false = non-apps
+    applicationFilter: null,
+    moduleTypeFilter: null,
+    // Combined domain for filtering
+    domain: [],
+    // UI states for dropdowns
+    stateDropdownOpen: false,
+    categoryDropdownOpen: false,
+    // Dependency direction: 'depends_on' or 'depended_by'
+    direction: 'depends_on',
+});
         this.graphNodes = null;
         this.graphEdges = null;
         this.network = null;
@@ -228,6 +231,7 @@ export class GraphModuleComponent extends Component {
     }
     onInputKeyup(event) {
         this.state.searchValue = event.target.value;
+        console.log(this.state.selectedModules)
     }
 
     onToggleState(event) {
@@ -390,8 +394,8 @@ export class GraphModuleComponent extends Component {
         const options = {};
         const excludeDomains = [];
 
-        // Set max depth if specified
-        if (this.state.maxDepth > 0) {
+        // Set max depth if enabled
+        if (this.state.limitDepthEnabled) {
             options.max_depth = this.state.maxDepth;
         }
 
@@ -404,7 +408,6 @@ export class GraphModuleComponent extends Component {
             options.exclude_domains = excludeDomains;
         }
 
-        console.log({ options })
 
         // Configure dependency/exclusion inclusion
         options.include_dependencies = this.state.includeDependencies !== false;
@@ -436,32 +439,23 @@ export class GraphModuleComponent extends Component {
 
             const moduleIds = [...Array.from(this.state.selectedModules), moduleId];
 
+            // Determine which backend method to call based on direction
+            const method = this.state.direction === 'depends_on' ? 'get_module_graph' : 'get_reverse_dependency_graph';
+
             // Call the server method with the options
             const data = await this.orm.call(
                 'ir.module.module',
-                'get_module_graph',
+                method,
                 [moduleIds],
                 { options }
             );
 
-            console.log({ data })
-            // // Process and add nodes to the graph
 
-            // const nodes = [];
-            // data.nodes.forEach(node => {
-            //     if (node.id) {
-            //         // Find the original node with all information
-            //         const originalNode = this.state.nodes.find(n => n.id === node.id);
-            //         if (originalNode) {
-            //             nodes.push(this.createNodeObject(originalNode));
-            //         }
-            //     }
-            // });
             this.graphNodes.update(data.nodes.map(node => this.createNodeObject(node)));
 
             const edges = [];
-            const graphEdges = Object.values(this.graphEdges._data) 
-            console.log({ graphEdges })
+            const graphEdges = Object.values(this.graphEdges._data)
+
             data.edges.forEach(edge => {
                 const existingEdge = graphEdges.find(e =>
                     e.from == edge.from && e.to == edge.to
@@ -477,20 +471,18 @@ export class GraphModuleComponent extends Component {
                         newEdge.color = {
                             color: 'red',
                             highlight: 'red'
-                            
+
                         };
                     }
 
 
                     this.state.edges.push(newEdge);
                     edges.push(newEdge);
-                }else {
-                    console.log({existingEdge})
                 }
             });
             this.graphEdges.update(edges);
             this.state.selectedModules.add(moduleId);
-            console.log({ selected: this.state.selectedModules, stateEdges: this.graphEdges, dataEdges: data.edges, })
+
         } catch (error) {
             console.error("Error fetching module graph data:", error);
         } finally {
@@ -508,6 +500,16 @@ export class GraphModuleComponent extends Component {
         this.state.maxDepth = parseInt(event.target.value, 10) || 0;
     }
 
+    /**
+     * Set dependency direction and clear graph
+     * @param {'depends_on'|'depended_by'} direction
+     */
+    setDirection(direction) {
+        if (this.state.direction !== direction) {
+            this.state.direction = direction;
+            this.onClearGraph();
+        }
+    }
     /**
      * Toggles stop on installed flag
      */
@@ -582,10 +584,35 @@ export class GraphModuleComponent extends Component {
         this.state.edges = []
     }
 
+    /**
+     * List of selected module objects for chips display
+     */
+    get selectedModuleObjects() {
+        return Array.from(this.state.selectedModules).map(id =>
+            this.state.nodes.find(node => node.id === id)
+        ).filter(Boolean);
+    }
+
+    /**
+     * Remove a module from selected modules and graph
+     */
+    removeSelectedModule(moduleId) {
+        this.state.selectedModules.delete(moduleId);
+        if (this.graphNodes && this.graphNodes._data[moduleId]) {
+            this.graphNodes.remove(moduleId);
+        }
+        // Optionally remove related edges
+        if (this.graphEdges) {
+            const edgesToRemove = Object.values(this.graphEdges._data).filter(
+                e => e.from == moduleId || e.to == moduleId
+            ).map(e => e.id);
+            this.graphEdges.remove(edgesToRemove);
+        }
+    }
+
 }
 
 // Register this component as a client action
 registry.category("actions").add("module_graph", GraphModuleComponent);
 
 export default GraphModuleComponent;
-
