@@ -31,8 +31,8 @@
                 selectedModules="state.selectedModules"
                 onRemoveModule.bind="onRemoveModule" />
             <GraphContainer
-                nodes="state.nodes"
-                edges="state.edges" />
+                graphNodes="graphNodes"
+                graphEdges="graphEdges" />
         </div>
     </div>
 </t>

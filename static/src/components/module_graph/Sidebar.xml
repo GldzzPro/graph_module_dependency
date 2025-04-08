@@ -14,8 +14,7 @@
         </div>
         <ul class="list-group module_graph_nav_list">
             <t t-foreach="filteredModules" t-as="module" t-key="module.id">
-                <li class="list-group-item"
-                    t-on-click="(ev) => onModuleClick(ev, module)">
+                <li class="list-group-item" t-on-click="onClickModule">
                     <img t-att-src="module.icon" class="rounded-circle o_object_fit_cover"
                          width="24" height="24" />
                     <label class="list-desc">

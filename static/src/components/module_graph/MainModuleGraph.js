@@ -13,6 +13,8 @@ export class MainModuleGraph extends Component {
     setup() {
         this.orm = useOrm();
         this.action = useAction();
+        this.graphNodes = null;
+        this.graphEdges = null;
 
         this.state = useState({
             modules: [],
@@ -32,10 +34,82 @@ export class MainModuleGraph extends Component {
             }));
         });
     }
+    /**
+ * Handle clicking on a module in the navigation list
+ * @param {Event} event - Click event
+ */
+    async onClickModule(event) {
+        const moduleId = parseInt(event.target.dataset.id);
+        const moduleNode = this.state.nodes.find(n => n.id === moduleId);
+
+        if (!moduleId || this.state.selectedModules.has(moduleId) || !moduleNode) {
+            return;
+        }
+
+        // Update the graph with the selected module
+        this.graphNodes.update([this.createNodeObject(moduleNode)]);
+
+        this.state.loading = true;
+
+        // Fetch module dependencies
+        try {
+            // Build options object with stop conditions
+            const options = {}
+
+            const moduleIds = [...Array.from(this.state.selectedModules), moduleId];
+
+            // Determine which backend method to call based on direction
+            const method = this.state.direction === 'depends_on' ? 'get_module_graph' : 'get_reverse_dependency_graph';
+
+            // Call the server method with the options
+            const data = await this.orm.call(
+                'ir.module.module',
+                method,
+                [moduleIds],
+                { options }
+            );
+
+
+            this.graphNodes.update(data.nodes.map(node => this.createNodeObject(node)));
+
+            const edges = [];
+            const graphEdges = Object.values(this.graphEdges._data)
+
+            data.edges.forEach(edge => {
+                const existingEdge = graphEdges.find(e =>
+                    e.from == edge.from && e.to == edge.to
+                );
+
+                if (!existingEdge) {
+                    const newEdge = {
+                        from: edge.from,
+                        to: edge.to
+                    };
+                    if (edge.type === 'cycleDirection') {
+                        newEdge.color = {
+                            color: 'red',
+                            highlight: 'red'
+                        };
+                    }
+                    this.state.edges.push(newEdge);
+                    edges.push(newEdge);
+                }
+            });
+            this.graphEdges.update(edges);
+            this.state.selectedModules.add(moduleId);
+
+        } catch (error) {
+            console.error("Error fetching module graph data:", error);
+        } finally {
+            this.state.loading = false;
+
+        }
+    }
 
     onSelectModule(module) {
         if (this.state.selectedModules.some(m => m.id === module.id)) return;
         this.state.selectedModules.push(module);
+        console.log({ module, selectedModules: this.state.selectedModules });
         this.fetchGraph();
     }
 
