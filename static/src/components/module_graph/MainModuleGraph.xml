@@ -4,11 +4,11 @@
     <div class="row">
         <div class="col-md-3">
             <Sidebar modules="state.modules"
-                     onSelectModule.bind="onSelectModule"
+                     onSelectModule.bind="onClickModule"
                      onChangeColor.bind="onChangeColor" />
         </div>
         <div class="col-md-9">
-            <DomainOptionsHeader
+                <!-- <DomainOptionsHeader
                 direction="state.direction"
                 limitDepthEnabled="state.limitDepthEnabled"
                 maxDepth="state.maxDepth"
@@ -26,13 +26,11 @@
                 onClearStopConditions="onClearStopConditions"
                 onRemoveState="onRemoveState"
                 onRemoveCategory="onRemoveCategory"
-                onClearApplicationFilter="onClearApplicationFilter" />
-            <SelectedModulesChips
+                onClearApplicationFilter="onClearApplicationFilter" /> -->
+                <!-- <SelectedModulesChips
                 selectedModules="state.selectedModules"
-                onRemoveModule.bind="onRemoveModule" />
-            <GraphContainer
-                graphNodes="graphNodes"
-                graphEdges="graphEdges" />
+                onRemoveModule.bind="onRemoveModule" /> -->
+            <GraphContainer            />
         </div>
     </div>
 </t>

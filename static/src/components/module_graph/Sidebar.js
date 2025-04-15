@@ -28,7 +28,8 @@ export class Sidebar extends Component {
         this.localState.searchValue = ev.target.value;
     }
 
-    onModuleClick = (ev, module) => {
+    onClickModule = (module) => {
+        console.log({module});
         this.props.onSelectModule(module);
     }
 
