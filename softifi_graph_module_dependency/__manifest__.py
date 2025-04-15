@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 {
-    "name": "Graph Module Dependency",
+    "name": "Softifi Graph Module Dependency",
     "summary": "Visualize and explore Odoo module dependencies with an interactive network graph.",
     "description": """
         The Graph Module Dependency addon leverages Owl and vis.js to present a dynamic visualization
