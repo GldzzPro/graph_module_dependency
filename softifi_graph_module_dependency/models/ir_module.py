@@ -1,11 +1,13 @@
 from odoo import models, api
 import logging
+from .graph_builder import GraphBuilderMixin
 
 _logger = logging.getLogger(__name__)
 
 
 class Module(models.Model):
-    _inherit = "ir.module.module"
+    _name = 'ir.module.module'
+    _inherit = ["ir.module.module", "graph.builder.mixin"]
 
     @api.model
     def get_module_graph(self, module_ids, options=None):
@@ -22,14 +24,15 @@ class Module(models.Model):
                 for m in modules
             ]
             return {"nodes": nodes, "edges": []}
-        return self._build_graph(
-            module_ids=module_ids,
+        
+        # Use the shared graph builder core
+        return self._build_graph_core(
+            record_ids=module_ids,
             options=options,
-            get_dependencies=lambda m: [d.depend_id for d in m.dependencies_id],
-            get_exclusions=lambda m: [
-                e.exclusion_id for e in getattr(m, "exclusion_ids", [])
-            ],
-            create_dependency_edge=lambda m, d: {
+            get_relations=self._get_module_dependencies,
+            get_exclusions=self._get_module_exclusions,
+            create_node=self._create_module_node,
+            create_relation_edge=lambda m, d: {
                 "from": m.id,
                 "to": d.id,
                 "type": "dependency",
@@ -39,6 +42,8 @@ class Module(models.Model):
                 "to": e.id,
                 "type": "exclusion",
             },
+            should_stop_traversal=self._should_stop_graph_traversal,
+            check_exclusion=self._check_module_exclusion,
         )
 
     @api.model
@@ -56,28 +61,15 @@ class Module(models.Model):
                 for m in modules
             ]
             return {"nodes": nodes, "edges": []}
-        return self._build_graph(
-            module_ids=module_ids,
+        
+        # Use the shared graph builder core
+        return self._build_graph_core(
+            record_ids=module_ids,
             options=options,
-            get_dependencies=lambda m: self.search(
-                [
-                    (
-                        "dependencies_id.depend_id",
-                        "in",
-                        [m.id],
-                    )  # Changed from '=' to 'in'
-                ]
-            ),
-            get_exclusions=lambda m: self.search(
-                [
-                    (
-                        "exclusion_ids.exclusion_id",
-                        "in",
-                        [m.id],
-                    )  # Changed from '=' to 'in'
-                ]
-            ),
-            create_dependency_edge=lambda m, d: {
+            get_relations=self._get_reverse_module_dependencies,
+            get_exclusions=self._get_reverse_module_exclusions,
+            create_node=self._create_module_node,
+            create_relation_edge=lambda m, d: {
                 "from": d.id,
                 "to": m.id,
                 "type": "reverse_dependency",
@@ -87,183 +79,70 @@ class Module(models.Model):
                 "to": m.id,
                 "type": "reverse_exclusion",
             },
+            should_stop_traversal=self._should_stop_graph_traversal,
+            check_exclusion=self._check_module_exclusion,
         )
 
-    def _build_graph(
-        self,
-        module_ids,
-        options,
-        get_dependencies,
-        get_exclusions,
-        create_dependency_edge,
-        create_exclusion_edge,
-    ):
-        """Shared graph builder with configurable traversal logic."""
-        options = dict(options or {})
-        if "current_depth" not in options:
-            options["current_depth"] = 0
-        if "cycle_counter" not in options:
-            options.update(
-                {
-                    "cycle_counter": 0,
-                    "all_visited": set(),
-                    "current_path": [],
-                    "cycles": {},
-                }
-            )
-
-        module_ids = module_ids if isinstance(module_ids, list) else [module_ids]
-        if not module_ids or (
-            options.get("max_depth", False)
-            and options["current_depth"] > options["max_depth"]
-        ):
-            return {"nodes": [], "edges": []}
-
-        modules = self.browse(module_ids)
-        nodes, edges = [], []
-
-        for module in modules:
-            # Cycle detection
-            if module.id in options["current_path"]:
-                cycle_start = options["current_path"].index(module.id)
-                cycle_nodes = options["current_path"][cycle_start:] + [module.id]
-                options["cycle_counter"] += 1
-                options["cycles"][options["cycle_counter"]] = set(cycle_nodes)
-                continue
-
-            options["current_path"].append(module.id)
-            options["all_visited"].add(module.id)
-
-            # Node creation
-            node_data = {
-                "id": module.id,
-                "label": module.name,
-                "state": module.state,
-                "depth": options["current_depth"],
-            }
-            if module.category_id:
-                node_data.update(
-                    {
-                        "category": module.category_id.name,
-                        "category_id": module.category_id.id,
-                    }
+    # Module-specific helper methods for graph building
+    
+    def _get_module_dependencies(self, module):
+        """Get module dependencies."""
+        return [d.depend_id for d in module.dependencies_id]
+    
+    def _get_module_exclusions(self, module):
+        """Get module exclusions."""
+        return [e.exclusion_id for e in getattr(module, "exclusion_ids", [])]
+    
+    def _get_reverse_module_dependencies(self, module):
+        """Get modules that depend on this module."""
+        return self.search(
+            [
+                (
+                    "dependencies_id.depend_id",
+                    "in",
+                    [module.id],
                 )
-            if hasattr(module, "is_custom"):
-                node_data["is_custom"] = module.is_custom
-            nodes.append(node_data)
-
-            if not self._should_stop_graph_traversal(module, options):
-                next_options = dict(options, current_depth=options["current_depth"] + 1)
-
-                # Process dependencies
-                if options.get("include_dependencies", True):
-                    deps = self._process_relations(
-                        module,
-                        get_dependencies,
-                        create_dependency_edge,
-                        next_options,
-                        edges,
-                        nodes,
-                        # Pass through all graph-building parameters:
-                        get_dependencies,
-                        get_exclusions,
-                        create_dependency_edge,
-                        create_exclusion_edge,
-                    )
-
-                # Process exclusions
-                if options.get("include_exclusions", True):
-                    self._process_relations(
-                        module,
-                        get_exclusions,
-                        create_exclusion_edge,
-                        next_options,
-                        edges,
-                        nodes,
-                        # Pass through all graph-building parameters:
-                        get_dependencies,
-                        get_exclusions,
-                        create_dependency_edge,
-                        create_exclusion_edge,
-                    )
-
-            options["current_path"].pop()
-
-        # Final processing
-        if options["current_depth"] == 0:
-            self._mark_cycles_in_graph(nodes, edges, options["cycles"])
-
-        return {
-            "nodes": list({n["id"]: n for n in nodes}.values()),
-            "edges": list({f"{e['from']}-{e['to']}": e for e in edges}.values()),
+            ]
+        )
+    
+    def _get_reverse_module_exclusions(self, module):
+        """Get modules that exclude this module."""
+        return self.search(
+            [
+                (
+                    "exclusion_ids.exclusion_id",
+                    "in",
+                    [module.id],
+                )
+            ]
+        )
+    
+    def _create_module_node(self, module, options):
+        """Create a node dictionary for a module record."""
+        node_data = {
+            "id": module.id,
+            "label": module.name,
+            "state": module.state,
+            "depth": options.get("current_depth", 0),
         }
-
-    def _process_relations(
-        self,
-        module,
-        get_relations,
-        create_edge,
-        next_options,
-        edges,
-        nodes,
-        get_dependencies,
-        get_exclusions,
-        create_dependency_edge,
-        create_exclusion_edge,
-    ):
-        """Helper to process dependencies/exclusions."""
-        relations = []
-        for rel in get_relations(module):
-            if self._check_module_exclusion(rel, next_options):
-                continue
-            relations.append(rel.id)
-            edges.append(create_edge(module, rel))
-
-        if relations:
-            res = self._build_graph(
-                relations,
-                next_options,
-                get_dependencies,  # Pass through original parameters
-                get_exclusions,
-                create_dependency_edge,
-                create_exclusion_edge,
-            )
-            nodes.extend(res["nodes"])
-            edges.extend(res["edges"])
-        return relations
-
-    def _mark_cycles_in_graph(self, nodes, edges, cycles):
-        """
-        Mark all nodes and edges that are part of cycles.
-
-        Args:
-            nodes: List of node dictionaries
-            edges: List of edge dictionaries
-            cycles: Dictionary mapping cycle_id to set of node IDs in that cycle
-
-        Returns:
-            Tuple (nodes, edges) with cycle information added
-        """
-        # Process nodes
-        for node in nodes:
-            for cycle_id, cycle_nodes in cycles.items():
-                if node["id"] in cycle_nodes:
-                    node["in_cycle"] = True
-                    node["cycle_id"] = cycle_id
-                    node["type"] = "cycleNode"
-
-        # Process edges
-        for edge in edges:
-            for cycle_id, cycle_nodes in cycles.items():
-                # Check if both ends of the edge are in the same cycle
-                if edge["from"] in cycle_nodes and edge["to"] in cycle_nodes:
-                    # Check if they're adjacent in the cycle path
-                    # (This requires more complex logic to determine edge direction in cycle)
-                    edge["in_cycle"] = True
-                    edge["cycle_id"] = cycle_id
-                    edge["type"] = "cycleDirection"
-
-        return nodes, edges
+        try:
+            category = module.read(["category_id"])
+            if category and category[0].get("category_id"):
+                cat_id, cat_name = category[0]["category_id"]
+                node_data.update({
+                    "category": cat_name,
+                    "category_id": cat_id,
+                })
+        except Exception:
+            # Skip category if not accessible
+            pass
+        if hasattr(module, "is_custom"):
+            node_data["is_custom"] = module.is_custom
+        return node_data
+    
+    def _create_node_data(self, record, options):
+        """Override from graph.builder.mixin to use module-specific node creation."""
+        return self._create_module_node(record, options)
 
     def _should_stop_graph_traversal(self, module, options):
         """

@@ -213,6 +213,12 @@ export class GraphModuleComponent extends Component {
         background: dataNode.in_cycle
           ? "red"
           : node.color || DEFAULT_STATE_COLOR[node.state],
+        highlight: dataNode.in_cycle
+          ? "red"
+          : node.color || DEFAULT_STATE_COLOR[node.state],
+        hover: dataNode.in_cycle
+          ? "red"
+          : node.color || DEFAULT_STATE_COLOR[node.state],
       },
       state: node.state,
       image: iconPath,
