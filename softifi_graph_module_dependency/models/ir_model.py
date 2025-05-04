@@ -2,7 +2,8 @@ from odoo import models, api
 from .graph_builder import GraphBuilderMixin
 
 
-class Model(models.Model):
+class IrModel(models.Model):
+    _name = 'ir.model'
     _inherit = ["ir.model", "graph.builder.mixin"]
 
     def get_model_relation_graph(
