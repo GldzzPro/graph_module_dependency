@@ -47,3 +47,53 @@ class ModuleGraphController(http.Controller):
         except Exception as e:
             _logger.error("Error fetching reverse dependency graph: %s", e, exc_info=True)
             return {'error': 'An error occurred while generating the reverse dependency graph.'}
+            
+    @http.route('/graph_module_dependency/category_module_graph', type='json', auth='public', methods=['POST'], csrf=False)
+    def get_category_module_graph_route(self, category_prefixes, options=None):
+        """
+        Public route to get the dependency graph for modules matching category prefixes.
+        :param list category_prefixes: List of strings representing category prefixes to match.
+        :param dict options: Optional dictionary for graph building options.
+            - exact_match: If True, only match exact category names, not prefixes
+            - include_subcategories: If True, include modules from subcategories
+            - max_depth: Maximum depth to traverse in the graph
+            - stop_domains: List of domains to stop traversal
+            - exclude_domains: List of domains to exclude modules
+        :return: JSON representation of the module graph.
+        """
+        try:
+            # Ensure category_prefixes is a list of strings
+            if not isinstance(category_prefixes, list) or not all(isinstance(prefix, str) for prefix in category_prefixes):
+                return {'error': 'Invalid input: category_prefixes must be a list of strings.'}
+
+            options = options or {}
+            graph_data = request.env['ir.module.module'].get_category_module_graph(category_prefixes, options=options)
+            return graph_data
+        except Exception as e:
+            _logger.error("Error fetching category module graph: %s", e, exc_info=True)
+            return {'error': 'An error occurred while generating the category module graph.'}
+
+    @http.route('/graph_module_dependency/reverse_category_module_graph', type='json', auth='public', methods=['POST'], csrf=False)
+    def get_reverse_category_module_graph_route(self, category_prefixes, options=None):
+        """
+        Public route to get the reverse dependency graph for modules matching category prefixes.
+        :param list category_prefixes: List of strings representing category prefixes to match.
+        :param dict options: Optional dictionary for graph building options.
+            - exact_match: If True, only match exact category names, not prefixes
+            - include_subcategories: If True, include modules from subcategories
+            - max_depth: Maximum depth to traverse in the graph
+            - stop_domains: List of domains to stop traversal
+            - exclude_domains: List of domains to exclude modules
+        :return: JSON representation of the reverse module graph.
+        """
+        try:
+            # Ensure category_prefixes is a list of strings
+            if not isinstance(category_prefixes, list) or not all(isinstance(prefix, str) for prefix in category_prefixes):
+                return {'error': 'Invalid input: category_prefixes must be a list of strings.'}
+
+            options = options or {}
+            graph_data = request.env['ir.module.module'].get_reverse_category_module_graph(category_prefixes, options=options)
+            return graph_data
+        except Exception as e:
+            _logger.error("Error fetching reverse category module graph: %s", e, exc_info=True)
+            return {'error': 'An error occurred while generating the reverse category module graph.'}

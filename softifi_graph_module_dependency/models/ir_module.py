@@ -1,6 +1,7 @@
 from odoo import models, api
 import logging
 from .graph_builder import GraphBuilderMixin
+from .module_category_helper import ModuleCategoryHelper
 
 _logger = logging.getLogger(__name__)
 
@@ -217,3 +218,155 @@ class Module(models.Model):
                 _logger.error(f"Error processing domain {domain}: {e}")
 
         return False
+        
+    @api.model
+    def get_category_module_graph(self, category_prefixes=None, options=None):
+        """Build a dependency graph for modules matching category patterns.
+        
+        Args:
+            category_prefixes: List of category prefixes to match (e.g. ['custom/hr', 'custom-hr'])
+                               Can be None if using whitelist/blacklist in options
+            options: Dictionary of options controlling graph behavior
+                - exact_match: If True, only match exact category names, not prefixes
+                - include_subcategories: If True, include modules from subcategories
+                - whitelist: List of patterns (plain substrings or regex) to include
+                - blacklist: List of patterns to exclude
+                - include_missing: Boolean indicating whether to include modules with no category
+                - max_depth: Maximum depth to traverse in the graph
+                - stop_domains: List of domains to stop traversal
+                - exclude_domains: List of domains to exclude modules
+            
+        Returns:
+            dict: Dictionary with 'nodes' and 'edges' lists representing the graph
+        """
+        options = options or {}
+        
+        # Extract category-specific options
+        category_options = {
+            'exact_match': options.pop('exact_match', False) if 'exact_match' in options else False,
+            'include_subcategories': options.pop('include_subcategories', True) if 'include_subcategories' in options else True
+        }
+        
+        # Add whitelist/blacklist/include_missing if present
+        if 'whitelist' in options:
+            category_options['whitelist'] = options.pop('whitelist')
+        if 'blacklist' in options:
+            category_options['blacklist'] = options.pop('blacklist')
+        if 'include_missing' in options:
+            category_options['include_missing'] = options.pop('include_missing')
+        
+        # Get modules matching the criteria
+        category_helper = ModuleCategoryHelper(self.env)
+        modules = category_helper.get_modules_by_category_prefixes(category_prefixes, category_options)
+        
+        if not modules:
+            return {"nodes": [], "edges": []}
+            
+        # If max_depth is 0, just return the nodes without edges
+        if options.get("max_depth", -1) == 0:
+            nodes = [
+                {
+                    "id": m.id,
+                    "label": m.name,
+                    "state": m.state,
+                }
+                for m in modules
+            ]
+            return {"nodes": nodes, "edges": []}
+        
+        # Use the shared graph builder core
+        return self._build_graph_core(
+            record_ids=modules.ids,
+            options=options,
+            get_relations=self._get_module_dependencies,
+            get_exclusions=self._get_module_exclusions,
+            create_node=self._create_module_node,
+            create_relation_edge=lambda m, d: {
+                "from": m.id,
+                "to": d.id,
+                "type": "dependency",
+            },
+            create_exclusion_edge=lambda m, e: {
+                "from": m.id,
+                "to": e.id,
+                "type": "exclusion",
+            },
+            should_stop_traversal=self._should_stop_graph_traversal,
+            check_exclusion=self._check_module_exclusion,
+        )
+        
+    @api.model
+    def get_reverse_category_module_graph(self, category_prefixes=None, options=None):
+        """Build a reverse dependency graph for modules matching category patterns.
+        
+        Args:
+            category_prefixes: List of category prefixes to match (e.g. ['custom/hr', 'custom-hr'])
+                               Can be None if using whitelist/blacklist in options
+            options: Dictionary of options controlling graph behavior
+                - exact_match: If True, only match exact category names, not prefixes
+                - include_subcategories: If True, include modules from subcategories
+                - whitelist: List of patterns (plain substrings or regex) to include
+                - blacklist: List of patterns to exclude
+                - include_missing: Boolean indicating whether to include modules with no category
+                - max_depth: Maximum depth to traverse in the graph
+                - stop_domains: List of domains to stop traversal
+                - exclude_domains: List of domains to exclude modules
+            
+        Returns:
+            dict: Dictionary with 'nodes' and 'edges' lists representing the graph
+        """
+        options = options or {}
+        
+        # Extract category-specific options
+        category_options = {
+            'exact_match': options.pop('exact_match', False) if 'exact_match' in options else False,
+            'include_subcategories': options.pop('include_subcategories', True) if 'include_subcategories' in options else True
+        }
+        
+        # Add whitelist/blacklist/include_missing if present
+        if 'whitelist' in options:
+            category_options['whitelist'] = options.pop('whitelist')
+        if 'blacklist' in options:
+            category_options['blacklist'] = options.pop('blacklist')
+        if 'include_missing' in options:
+            category_options['include_missing'] = options.pop('include_missing')
+        
+        # Get modules matching the criteria
+        category_helper = ModuleCategoryHelper(self.env)
+        modules = category_helper.get_modules_by_category_prefixes(category_prefixes, category_options)
+        
+        if not modules:
+            return {"nodes": [], "edges": []}
+            
+        # If max_depth is 0, just return the nodes without edges
+        if options.get("max_depth", -1) == 0:
+            nodes = [
+                {
+                    "id": m.id,
+                    "label": m.name,
+                    "state": m.state,
+                }
+                for m in modules
+            ]
+            return {"nodes": nodes, "edges": []}
+        
+        # Use the shared graph builder core
+        return self._build_graph_core(
+            record_ids=modules.ids,
+            options=options,
+            get_relations=self._get_reverse_module_dependencies,
+            get_exclusions=self._get_reverse_module_exclusions,
+            create_node=self._create_module_node,
+            create_relation_edge=lambda m, d: {
+                "from": d.id,
+                "to": m.id,
+                "type": "reverse_dependency",
+            },
+            create_exclusion_edge=lambda m, e: {
+                "from": e.id,
+                "to": m.id,
+                "type": "reverse_exclusion",
+            },
+            should_stop_traversal=self._should_stop_graph_traversal,
+            check_exclusion=self._check_module_exclusion,
+        )
