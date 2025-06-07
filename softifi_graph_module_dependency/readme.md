@@ -1,107 +1,237 @@
-Graph Module for Odoo
-This module offers an interactive graph visualization of Odoo modules using the Owl framework and vis.js library. It helps users quickly explore module dependencies, statuses, and more by displaying nodes and edges that represent modules and their relationships.
+# Softifi Graph Module Dependency for Odoo
 
-Features
-Interactive Graph View:
-Visualizes module dependencies using a network graph. Double-click a node to view the module’s form, right-click to remove a node.
+This module offers an interactive graph visualization of Odoo modules and their dependencies using the Owl framework and vis.js library. It helps users quickly explore module dependencies, statuses, and relationships by displaying nodes and edges that represent modules and their connections.
 
-Module Filtering:
-Provides filtering tools based on module states, categories, application flags, and custom domains. Users can search modules by name or description.
+## Features
 
-Dynamic Data Loading:
-Loads module information using Odoo’s ORM service, fetching fields such as name, shortdesc, state, category_id, and icons.
+### Interactive Graph View
+- Visualizes module dependencies using a network graph
+- Double-click a node to view the module's form
+- Right-click to remove a node from the graph
+- Intuitive navigation with zoom and pan controls
 
-Customizable Appearance:
-Uses a default set of state colors and icons, which you can override as needed. Graph node appearance (size, shape, margins) is configurable via the module’s constants.
+### Module Filtering
+- Filter modules based on state (installed, uninstalled, to upgrade, etc.)
+- Filter by category or application flag
+- Search modules by name or description
+- Apply custom domains for advanced filtering
 
-Dependency Direction Toggle:
-Switch between analyzing dependencies (depends_on) or reverse dependencies (depended_by) to better understand module interrelations.
+### Dynamic Data Loading
+- Loads module information using Odoo's ORM service
+- Fetches fields such as name, shortdesc, state, category_id, and icons
+- Real-time updates when module states change
 
-Graph Options Configuration:
-Allows customization of the depth of the graph and specifies stop conditions (e.g., stopping when an installed module or a specific category is encountered).
+### Customizable Appearance
+- Default state colors and icons that can be overridden
+- Configurable graph node appearance (size, shape, margins)
+- Visual indicators for module states and relationships
 
-Prerequisites
-Odoo Framework:
-Ensure you are running a compatible version of Odoo that supports Owl and client action registry.
+### Dependency Direction Toggle
+- Switch between analyzing dependencies (depends_on) or reverse dependencies (depended_by)
+- Understand both what a module requires and what depends on it
 
-Internet Access:
-The module loads the vis.js library and its CSS from the CDN. A stable internet connection is required.
+### Graph Options Configuration
+- Customize the depth of the graph traversal
+- Specify stop conditions (e.g., stopping when an installed module is encountered)
+- Control which categories to include or exclude
 
-Installation
-Clone or Copy the Module:
+## API Controllers and Endpoints
 
-Place the module directory in your Odoo addons folder:
+The module exposes several API endpoints that allow programmatic access to the dependency graph data. These endpoints can be used to integrate the graph functionality into other modules or external systems.
 
-bash
-Copy
-Edit
-cp -R path/to/graph_module /path/to/odoo/addons/
-Note: Replace graph_module with the actual folder name containing your module.
+### Main Controllers
 
-Update the App List:
+The module provides two main controller classes:
 
-In your Odoo instance, go to Apps.
+1. **GraphAPI** - JSON-RPC endpoints with `/api/graph/` prefix
+2. **ModuleGraphController** - JSON-RPC endpoints with `/graph_module_dependency/` prefix
 
-Click on Update Apps List to refresh the module registry.
+### Available Endpoints
 
-Install the Module:
+#### Module Graph Endpoints
 
-Search for the Graph Module in the Apps list.
+- **`/api/graph/module`** (JSON-RPC)
+  - Get module dependency graph data
+  - Parameters:
+    - `module_ids`: List of module IDs
+    - `options`: Dictionary of graph options
 
-Click Install to deploy the module.
+- **`/api/graph/reverse`** (JSON-RPC)
+  - Get reverse module dependency graph data
+  - Parameters:
+    - `module_ids`: List of module IDs
+    - `options`: Dictionary of graph options
 
-Usage
-Access the Graph Interface:
+- **`/graph_module_dependency/module_graph`** (JSON-RPC)
+  - Public route to get the dependency graph for given module IDs
+  - Parameters:
+    - `module_ids`: List of integers representing module IDs
+    - `options`: Optional dictionary for graph building options
 
-Navigate to the module’s menu from the Odoo dashboard.
+- **`/graph_module_dependency/reverse_module_graph`** (JSON-RPC)
+  - Public route to get the reverse dependency graph for given module IDs
+  - Parameters:
+    - `module_ids`: List of integers representing module IDs
+    - `options`: Optional dictionary for graph building options
 
-The interface displays a network graph of available modules.
+#### Category-Based Graph Endpoints
 
-Interacting With the Graph:
+- **`/api/graph/category`** (JSON-RPC)
+  - Get module dependency graph data for modules matching category prefixes
+  - Parameters:
+    - `category_prefixes`: List of category prefixes to match (e.g. ['custom/hr', 'custom-hr'])
+    - `options`: Dictionary of options controlling graph behavior
 
-Double-click on a node to open the form view of that module.
+- **`/api/graph/category/reverse`** (JSON-RPC)
+  - Get reverse module dependency graph data for modules matching category prefixes
+  - Parameters:
+    - `category_prefixes`: List of category prefixes to match
+    - `options`: Dictionary of options controlling graph behavior
 
-Right-click on a node to remove it from the graph.
+- **`/graph_module_dependency/category_module_graph`** (JSON-RPC)
+  - Public route to get the dependency graph for modules matching category prefixes
+  - Parameters:
+    - `category_prefixes`: List of strings representing category prefixes to match
+    - `options`: Optional dictionary for graph building options
 
-Use the search input to filter nodes by module name or description.
+- **`/graph_module_dependency/reverse_category_module_graph`** (JSON-RPC)
+  - Public route to get the reverse dependency graph for modules matching category prefixes
+  - Parameters:
+    - `category_prefixes`: List of strings representing category prefixes to match
+    - `options`: Optional dictionary for graph building options
 
-Toggle filters (state, category, application, and module type) to control which modules are displayed.
+#### Model Graph Endpoints
 
-Adjust Graph Settings:
+- **`/api/graph/model`** (JSON-RPC)
+  - Get model relation graph data
+  - Parameters:
+    - `model_ids`: List of model IDs
+    - `options`: Dictionary containing options like max_depth
 
-Configure the maximum graph depth, dependency direction (e.g., modules that “depend on” or “are depended by” a given module), and stop conditions (e.g., stop on installed modules or specified categories).
+### Graph Options
 
-Module Structure
-JavaScript Component (GraphModuleComponent):
-The core component built with Owl which renders the graph. It integrates with the Odoo action system and uses dynamic events to manage node selection, update filters, and fetch dependency data.
+The following options can be passed to the graph endpoints:
 
-Assets and Dependencies:
+- `max_depth`: Maximum depth to traverse in the graph (integer)
+- `stop_domains`: List of domains to stop traversal (e.g., stop on installed modules)
+- `exclude_domains`: List of domains to exclude modules from the graph
+- `exact_match`: For category endpoints, if True, only match exact category names, not prefixes
+- `include_subcategories`: For category endpoints, if True, include modules from subcategories
+- `include_relations`: Whether to include relation edges (boolean, default True)
+- `include_exclusions`: Whether to include exclusion edges (boolean, default True)
 
-vis.js: Loaded via CDN for rendering the graph.
+## How to Use the API
 
-Owl Framework: Used for component and state management.
+### Example: Fetching Module Dependencies
 
-Odoo ORM Service: Retrieves module data, ensuring the graph is up-to-date with current module statuses.
+```python
+# Using the Odoo RPC API
+import xmlrpc.client
 
-Customization
-Default Colors and Icons:
-Modify DEFAULT_STATE_COLOR and DEFAULT_MODULE_ICON in the source file to align with your branding or design requirements.
+# Connect to Odoo
+url = 'http://localhost:8069'
+db = 'your_database'
+username = 'your_username'
+password = 'your_password'
 
-Network Options:
-Adjust properties in DEFAULT_NETWORK_OPTIONS to change node size, shape, and overall layout behavior.
 
-Filter and Domain Customization:
-The module supports custom filtering via state, category, and application flags. You can extend the filtering logic in the updateDomain method as needed.
 
-Troubleshooting
-Graph Not Displaying:
-Ensure that the vis.js library is accessible from your network. Check your browser’s console for any errors related to asset loading or API calls.
+# Get the API endpoint
+models = xmlrpc.client.ServerProxy('{}/xmlrpc/2/object'.format(url))
 
-Module Data Not Loading:
-Verify that your Odoo environment has the required permissions and that the ir.module.module model is returning the expected fields.
+# Get module IDs (example: get the 'base' module ID)
+base_module_id = models.execute_kw(db, uid, password,
+    'ir.module.module', 'search',
+    [[['name', '=', 'base']]]
+)
 
-Contributing
-Contributions are welcome! If you find issues, have suggestions, or want to extend the functionality, please create an issue or submit a pull request in the module’s repository.
+# Call the graph API
+options = {
+    'max_depth': 2,
+    'stop_domains': [["state", "=", "installed"]]
+}
 
-License
-Specify the license under which this module is published (e.g., AGPL-3, LGPL, MIT). Make sure it is compatible with your use case and any modifications you plan to make.
+graph_data = models.execute_kw(db, uid, password,
+    'ir.module.module', 'get_module_graph',
+    [base_module_id, options]
+)
+
+# Process the graph data
+print(f"Found {len(graph_data['nodes'])} nodes and {len(graph_data['edges'])} edges")
+```
+
+### Example: Using curl with JSON-RPC
+
+```bash
+# Using curl to call the module graph API
+
+# Set the base URL for your Odoo instance
+BASE_URL="http://localhost:8069"
+
+# Define the endpoint for module graph
+MODULE_GRAPH_ENDPOINT="$BASE_URL/graph_module_dependency/module_graph"
+
+# Example: Get dependency graph for the base module (ID: 1)
+curl -s -X POST "$MODULE_GRAPH_ENDPOINT" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc": "2.0",
+    "method": "call",
+    "params": {
+      "module_ids": [1],
+      "options": {
+        "max_depth": 2,
+        "stop_domains": [["state", "=", "installed"]]
+      }
+    },
+    "id": 123456
+  }'
+
+# To process the response with jq (if installed)
+# curl -s -X POST "$MODULE_GRAPH_ENDPOINT" ... | jq '.result'
+
+# Example: Get reverse dependency graph
+REVERSE_GRAPH_ENDPOINT="$BASE_URL/graph_module_dependency/reverse_module_graph"
+
+curl -s -X POST "$REVERSE_GRAPH_ENDPOINT" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc": "2.0",
+    "method": "call",
+    "params": {
+      "module_ids": [1],
+      "options": {
+        "max_depth": 2
+      }
+    },
+    "id": 123456
+  }'
+```
+
+## Prerequisites
+
+### Odoo Framework
+- Ensure you are running Odoo 17.0 or compatible version that supports Owl and client action registry
+
+### Internet Access
+- The module loads the vis.js library and its CSS from the CDN
+- A stable internet connection is required for initial loading
+
+## Installation
+
+1. **Clone or Copy the Module**
+   ```bash
+   cp -R path/to/softifi_graph_module_dependency /path/to/odoo/addons/
+   ```
+
+2. **Update the App List**
+   - In your Odoo instance, go to Apps
+   - Click on Update Apps List to refresh the module registry
+
+3. **Install the Module**
+   - Search for "Softifi Graph Module Dependency" in the Apps list
+   - Click Install to deploy the module
+
+## License
+
+This module is published under the AGPL-3 license, as specified in the module's manifest.
